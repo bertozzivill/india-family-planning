@@ -3,6 +3,7 @@
 
 library(data.table)
 library(ggplot2)
+library(stringr)
 
 rm(list=ls())
 
@@ -60,7 +61,7 @@ ggplot(demog, aes(x=school.code, fill=gender.agreement)) +
 ggplot(demog, aes(x=school.code, fill=language)) +
         geom_bar(position= "fill") 
 ## TODO: ask if schools 1,2, and 10 had different language conventions
-
+## TODO: religion?
 
 # age distribution by (confirmed) gender:
 age_dist <- ggplot(demog, aes(x=age)) +
@@ -71,7 +72,6 @@ age_dist <- ggplot(demog, aes(x=age)) +
                  x="Reported Age",
                  y="Density")
 
-## TODO: ask if we should keep (38!) students who report an age greater than 20
 
 # age distribution by (confirmed) gender and school code:
 age_dist_school <- ggplot(demog, aes(x=age)) +
@@ -95,10 +95,25 @@ milestones <- milestones[!is.na(age)]
 # add event name 
 milestones <- merge(milestones, events[, list(event.id, event.name)], by="event.id", all.x=T)
 
+# summary dataset on desire for marriage, children, number of children, and respective ages of events
+child_data <- milestones[key %like% "Baby"]
+child_data[, child.idx:= as.integer(str_extract(key, "[0-9]+"))]
+child_data[, child.sex:= str_extract(value, "Male|Female")]
+child_data[, age.at.child:= as.integer(str_extract(value, "[0-9]+"))]
+child_data[, c("key", "value", "event.name", "school.code", "event.id"):=NULL]
+child_data[, child.count:= .N, by="user.id"]
+
+child_age <- milestones[event.name=="children" & key=="age", list(user.id, child.age=as.integer(value))]
+
+marriage_data <- milestones[event.name=="marriage" & key=="age", list(user.id, confirmed.gender, age, marriage.age=as.integer(value))]
+marriage_data[, wants.marriage:= marriage.age>0]
+
+family_summary <- merge(marriage_data, unique(child_data[, list(user.id, child.count)]), by="user.id", all=T)
+family_summary[is.na(child.count), child.count:=0]
+family_summary[,wants.children:= child.count>0]
+family_summary <- merge(family_summary, child_age, by="user.id", all=T)
+
 ## Question 1: what age do people want to get married?
-marriage_age <- milestones[event.name=="marriage" & key=="age"]
-marriage_age[, value:= as.integer(value)]
-# not shown: 44 girls & 21 males who do not want to get married
 marriage_age_plot <- ggplot(marriage_age[value>0], aes(x=as.integer(value))) +
                       geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
                       facet_grid(~confirmed.gender) +
@@ -124,14 +139,27 @@ ggplot(marriage_age[value==0], aes(x=age)) +
 ## Question 2: at what age do people want their first child?
 children_age <- milestones[event.name=="children" & key=="age"]
 children_age[, value:= as.integer(value)]
-# not shown: 44 girls & 21 males who do not want to get married
-child_age_plot <- ggplot(children_age[value>0], aes(x=as.integer(value))) +
+child_age_plot <- ggplot(children_age[value>0], aes(x=value)) +
                   geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
                   facet_grid(~confirmed.gender) +
                   theme(legend.title = element_blank()) + 
                   labs(title="Desired Age at First Child, by Gender",
                        x="Age",
                        y="Count")
+
+## Sanity check: do people want "children" at the age at which they say they want their first child?
+child_data <- milestones[key %like% "Baby"]
+child_data[, child.idx:= as.integer(str_extract(key, "[0-9]+"))]
+child_data[, child.sex:= str_extract(value, "Male|Female")]
+child_data[, age.at.child:= as.integer(str_extract(value, "[0-9]+"))]
+
+first_data <- child_data[child.idx==0]
+first_data <- merge(first_data, children_age[, list(user.id, age.at.children=value)], by="user.id", all.x=T)
+first_data[, diff:= age.at.child-age.at.children]
+
+ggplot(first_data[age>20], aes(x=age.at.children, y=age.at.child)) +
+  geom_point(aes(color=age), alpha=0.75) +
+  facet_grid(~confirmed.gender)
 
 # todo: does anyone want kids but not marriage?
 
