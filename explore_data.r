@@ -4,8 +4,13 @@
 library(data.table)
 library(ggplot2)
 library(stringr)
+library(Hmsic)
+library(scales)
 
 rm(list=ls())
+
+## set ggtheme
+theme_set(theme_minimal())
 
 main_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/family_planning_game/pilot_data/"
 if (!dir.exists(main_dir)){
@@ -13,7 +18,7 @@ if (!dir.exists(main_dir)){
 }
 
 events <- fread(paste0(main_dir, "mff_study_events.csv"))
-event_data <- fread(paste0(main_dir, "mff_study_eventdata.csv")) # todo: replace this with 'events.csv' with full timestamp
+event_data <- fread(paste0(main_dir, "mff_study_eventdata.csv"))
 
 setnames(events, c("event.id", "old.user.id", "event.name", "event.type", "device.id", "timestamp"))
 setnames(event_data, c("event.id", "key", "value"))
@@ -52,14 +57,22 @@ demog[, times.played:= .N, by="user.id"]
 ## sanity check #2: How often is there a gender mismatch, by school?
 demog[, gender.agreement:= gender==confirmed.gender]
 
-ggplot(demog, aes(x=school.code, fill=gender.agreement)) +
-      geom_bar(position= "fill") 
+gender_check <- ggplot(demog, aes(x=school.code, fill=gender.agreement)) +
+                geom_bar(position= "fill") +
+                labs(title="Gender disagreement, by school",
+                     x="School Code",
+                     y="Gender (dis)agreement Proportions")
 
 ## TODO: see if cases with sex mismatch are different from the others
 
 # compare English vs Kannada by school
-ggplot(demog, aes(x=school.code, fill=language)) +
-        geom_bar(position= "fill") 
+
+language <- ggplot(demog, aes(x=school.code, fill=language)) +
+            geom_bar(position= "fill") +
+            labs(title="Game Language, by School",
+                 x="School Code",
+                 y="Language Proportions")
+
 ## TODO: ask if schools 1,2, and 10 had different language conventions
 ## TODO: religion?
 
@@ -70,7 +83,7 @@ age_dist <- ggplot(demog, aes(x=age)) +
             theme(legend.title = element_blank()) +
             labs(title="Distributions of Reported Age, by Confirmed Gender",
                  x="Reported Age",
-                 y="Density")
+                 y="Count")
 
 
 # age distribution by (confirmed) gender and school code:
@@ -112,9 +125,11 @@ family_summary <- merge(marriage_data, unique(child_data[, list(user.id, child.c
 family_summary[is.na(child.count), child.count:=0]
 family_summary[,wants.children:= child.count>0]
 family_summary <- merge(family_summary, child_age, by="user.id", all=T)
+family_summary <- merge(family_summary, child_data[child.idx==0, list(user.id, age.at.first.child=age.at.child)], by="user.id", all=T)
+family_summary[is.na(age.at.first.child), age.at.first.child:=0]
 
-## Question 1: what age do people want to get married?
-marriage_age_plot <- ggplot(marriage_age[value>0], aes(x=as.integer(value))) +
+## Question: What age do people want to get married?
+marriage_age_plot <- ggplot(family_summary, aes(x=marriage.age)) +
                       geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
                       facet_grid(~confirmed.gender) +
                       theme(legend.title = element_blank()) + 
@@ -122,24 +137,18 @@ marriage_age_plot <- ggplot(marriage_age[value>0], aes(x=as.integer(value))) +
                            x="Age",
                            y="Count")
 
-## current age vs age of marriage
-ggplot(marriage_age, aes(x=age, y=value)) +
-  geom_jitter(aes(color=confirmed.gender))
+## Question: How does current age compare to desired age of marriage?
+years_to_marriage <- ggplot(family_summary[wants.marriage==T], aes(x=marriage.age-age)) +
+                            geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
+                            geom_vline(xintercept=0) +
+                            facet_grid(~confirmed.gender) +
+                            theme(legend.title = element_blank()) + 
+                            labs(title="Desired Years Until Marriage, by Gender",
+                                 x="Marriage Age Minus Current Age",
+                                 y="Count")
 
-## age dists of those who don't want to marry
-ggplot(marriage_age[value==0], aes(x=age)) +
-  geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
-  facet_grid(~confirmed.gender) +
-  theme(legend.title = element_blank()) + 
-  labs(title="Age Distribution of Students Who Don't Want Marriage, by Gender",
-       x="Age",
-       y="Count")
-
-
-## Question 2: at what age do people want their first child?
-children_age <- milestones[event.name=="children" & key=="age"]
-children_age[, value:= as.integer(value)]
-child_age_plot <- ggplot(children_age[value>0], aes(x=value)) +
+## Question: At what age do people want their first child?
+child_age_plot <- ggplot(family_summary, aes(x=child.age)) +
                   geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
                   facet_grid(~confirmed.gender) +
                   theme(legend.title = element_blank()) + 
@@ -147,30 +156,20 @@ child_age_plot <- ggplot(children_age[value>0], aes(x=value)) +
                        x="Age",
                        y="Count")
 
-## Sanity check: do people want "children" at the age at which they say they want their first child?
-child_data <- milestones[key %like% "Baby"]
-child_data[, child.idx:= as.integer(str_extract(key, "[0-9]+"))]
-child_data[, child.sex:= str_extract(value, "Male|Female")]
-child_data[, age.at.child:= as.integer(str_extract(value, "[0-9]+"))]
+child_age_plot_alt <- ggplot(family_summary, aes(x=age.at.first.child)) +
+                      geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
+                      facet_grid(~confirmed.gender) +
+                      theme(legend.title = element_blank()) + 
+                      labs(title="Desired Age at First Child, by Gender (Using Timeline)",
+                           x="Age",
+                           y="Count")
 
-first_data <- child_data[child.idx==0]
-first_data <- merge(first_data, children_age[, list(user.id, age.at.children=value)], by="user.id", all.x=T)
-first_data[, diff:= age.at.child-age.at.children]
-
-ggplot(first_data[age>20], aes(x=age.at.children, y=age.at.child)) +
-  geom_point(aes(color=age), alpha=0.75) +
-  facet_grid(~confirmed.gender)
 
 # todo: does anyone want kids but not marriage?
 
 
-## Question 3: how many kids do people want?
-children <- milestones[event.name=="children" & key %like% "Baby"]
-children[, count:= .N, by="event.id"]
-
-child_count <- unique(children[, list(user.id, game.age, confirmed.gender, count)])
-
-child_count_plot <- ggplot(child_count, aes(x=count)) +
+## Question: how many kids do people want? What Gender?
+child_count_plot <- ggplot(family_summary, aes(x=child.count)) +
                     geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) + 
                     facet_grid(~confirmed.gender) +
                     theme(legend.title = element_blank()) + 
@@ -178,32 +177,40 @@ child_count_plot <- ggplot(child_count, aes(x=count)) +
                          x="# of Children",
                          y="Count")
 
-# Question 4: Who influences marriage choices?
-marriage_influence <- milestones[event.name=="marriage" & key=="influencer"]
+child_data[, confirmed.gender:= paste(confirmed.gender, "Respondent")]
+child_data[, child.sex:= paste(child.sex, "Child")]
 
-marriage_influence_plot <- ggplot(marriage_influence, aes(x=value)) +
-                              geom_bar(aes(fill=value, color=value)) +
-                              facet_grid(~confirmed.gender)+
-                              theme(legend.position = "none",
-                                    axis.text.x=element_text(angle=45, hjust=1)) + 
-                              labs(title="Influencers of Marriage Choices",
-                                   x="Influencer",
-                                   y="Count")
-
-# Question 5: Who influences child choices?
-children_influence <- milestones[event.name=="children" & key=="influencer"]
-
-child_influence_plot <- ggplot(children_influence, aes(x=value)) +
-                          geom_bar(aes(fill=value, color=value)) +
-                          facet_grid(~confirmed.gender)+
-                          theme(legend.position = "none",
-                                axis.text.x=element_text(angle=45, hjust=1)) + 
-                          labs(title="Influencers of Child Choices",
-                               x="Influencer",
-                               y="Count")
+child_gender_plot <- ggplot(child_data, aes(x=child.idx)) +
+                      geom_bar(aes(fill=child.sex, color=child.sex), alpha=0.5) +
+                      facet_grid(~confirmed.gender) +
+                      theme(legend.title = element_blank()) + 
+                      labs(title="Desired Sex of Each Child, by Respondent Sex",
+                           x="Child",
+                           y="Count")
 
 
-# Question 6: What's the average time spent on each minigame?
+# Question: Who influences life choices
+influencers <- milestones[key=="influencer", list(user.id, influencer=value, confirmed.gender,
+                                                  milestone=capitalize(event.name))]
+influencer_order <- influencers[, list(count=sum(.N)), by=influencer][order(count)]$influencer
+influencers[, influencer:= factor(influencer, levels=influencer_order)]
+influencers[, milestone:=factor(milestone, levels=c("Graduation", "Lifepartner", "Marriage", "Children"))]
+
+influence_plot <- ggplot(influencers, aes(x=milestone)) +
+                  geom_bar(aes(fill=influencer, color=influencer), alpha=0.75) +
+                  facet_grid(~confirmed.gender) +
+                  theme(legend.title = element_blank(),
+                        axis.text.x = element_text(angle=45, hjust=1)) + 
+                  scale_color_manual(values=rev(hue_pal()(5))) +
+                 scale_fill_manual(values=rev(hue_pal()(5))) +
+                  labs(title="Milestone Influencers, by Sex",
+                       x="Milestone",
+                       y="Count")
+
+## --------------------------------------------------------------------------------------------------------------
+
+
+# Question: What's the average time spent on each minigame?
 games <- events[event.type=="MG" & !event.name %like% "win"]
 games[, timestamp:= strptime(timestamp, format="%Y-%m-%d %H:%M:%S")]
 
@@ -225,7 +232,7 @@ games <- games[, list(duration=sum(duration)), by=list(user.id, game.type)]
 mean_games <- games[, list(mean.duration=mean(duration)), by="game.type"]
 mean_games[, game.type:= gsub("game","Game", game.type)]
 
-minigame_plot <- ggplot(mean_games, aes(x=game.type, y=mean.duration)) +
+ggplot(mean_games, aes(x=game.type, y=mean.duration)) +
                   geom_bar(aes(color=game.type, fill=game.type), stat="identity") +
                   theme(legend.position = "none",
                         axis.text.x = element_text(angle=45, hjust=1)) +
@@ -237,7 +244,7 @@ minigame_plot <- ggplot(mean_games, aes(x=game.type, y=mean.duration)) +
 games[, tot.duration:= sum(duration), by=list(user.id)]
 tot_duration <- unique(games[,list(user.id, tot.duration)])
 
-tot_time_plot <- ggplot(tot_duration, aes(x=tot.duration)) +
+ggplot(tot_duration, aes(x=tot.duration)) +
                 geom_density(fill="black", alpha=0.5) +
                 geom_vline(xintercept = mean(tot_duration$tot.duration), color="red") + 
                 # geom_label(x=mean(tot_duration$tot.duration), y=0.14, label=mean(tot_duration$tot.duration))+
@@ -245,56 +252,24 @@ tot_time_plot <- ggplot(tot_duration, aes(x=tot.duration)) +
                      x="Total Duration (minutes)",
                      y="Count")
 
+## --------------------------------------------------------------------------------------------------------------
+## plotting
+
+plots <- Filter( function(x) 'ggplot' %in% class( get(x) ), ls() )
+
 
 pdf(paste0(main_dir, "prelim_plots.pdf"), width=11, height=8.5)
 
-print(age_dist)
-print(age_dist_school)
-print(marriage_age_plot)
-print(child_age_plot)
-print(child_count_plot)
-print(marriage_influence_plot)
-print(child_influence_plot)
-print(minigame_plot)
+for (plot in plots){
+  print(get(plot))
+}
 
 graphics.off()
 
-png(paste0(main_dir, "prelim_plots/age_dist.png"), height=900, width=900, units = "px", res=140)
-print(age_dist)
-graphics.off()
 
-png(paste0(main_dir, "prelim_plots/age_dist_school.png"), height=1200, width=900, units = "px", res=140)
-print(age_dist_school)
-graphics.off()
-
-png(paste0(main_dir, "prelim_plots/marriage_age_plot.png"), height=900, width=900, units = "px", res=140)
-print(marriage_age_plot)
-graphics.off()
-
-png(paste0(main_dir, "prelim_plots/child_age_plot.png"), height=900, width=900, units = "px", res=140)
-print(child_age_plot)
-graphics.off()
-
-png(paste0(main_dir, "prelim_plots/child_count_plot.png"), height=900, width=900, units = "px", res=140)
-print(child_count_plot)
-graphics.off()
-
-png(paste0(main_dir, "prelim_plots/marriage_influence_plot.png"), height=900, width=900, units = "px", res=140)
-print(marriage_influence_plot)
-graphics.off()
-
-png(paste0(main_dir, "prelim_plots/child_influence_plot.png"), height=900, width=900, units = "px", res=140)
-print(child_influence_plot)
-graphics.off()
-
-png(paste0(main_dir, "prelim_plots/minigame_plot.png"), height=900, width=900, units = "px", res=140)
-print(minigame_plot)
-graphics.off()
-
-png(paste0(main_dir, "prelim_plots/tot_time_plot.png"), height=900, width=900, units = "px", res=140)
-print(tot_time_plot)
-graphics.off()
-
-
-
+for (plot in plots){
+  png(paste0(main_dir, "prelim_plots/", plot, ".png"), height=900, width=900, units = "px", res=140)
+  print(get(plot))
+  graphics.off()
+}
 
