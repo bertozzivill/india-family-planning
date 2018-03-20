@@ -4,7 +4,7 @@
 library(data.table)
 library(ggplot2)
 library(stringr)
-library(Hmsic)
+library(Hmisc)
 library(scales)
 
 rm(list=ls())
@@ -54,6 +54,7 @@ setnames(demog, c("confirmed gender", "school code"), c("confirmed.gender", "sch
 demog[, school.code:=as.integer(school.code)]
 demog[, times.played:= .N, by="user.id"]
 
+
 ## sanity check #2: How often is there a gender mismatch, by school?
 demog[, gender.agreement:= gender==confirmed.gender]
 
@@ -95,6 +96,7 @@ age_dist_school <- ggplot(demog, aes(x=age)) +
                          x="Reported Age",
                          y="Density")
 
+
 ## --------------------------------------------------------------------------------------------------------------
 
 ## Deeper dive into milestones
@@ -106,34 +108,76 @@ milestones <- merge(milestones, demog[, list(user.id, age, confirmed.gender, sch
 milestones <- milestones[!is.na(age)]
 
 # add event name 
-milestones <- merge(milestones, events[, list(event.id, event.name)], by="event.id", all.x=T)
+milestones <- merge(milestones, events[, list(event.id, event.name)], by="event.id")
+
+# plot before dropping older ages: what age do people want marriage/children, compared to the age they stated?
+age_comparison <- milestones[event.name %in% c("children", "marriage") & key=="age"]
+age_comparison[, age.at.event:=as.integer(value)]
+age_comparison[, event.name := ifelse(event.name=="children", "First Child", "Marriage")]
+age_comparison <- age_comparison[, list(count=.N), by=list(event.name, confirmed.gender, 
+                                                           age, age.at.event)]
+
+age_milestone_compare <- ggplot(age_comparison[age.at.event>0], aes(x=age, y=age.at.event)) +
+                          geom_point(aes(color=confirmed.gender, size=count), alpha=0.75) +
+                          scale_color_discrete(guide=FALSE) + 
+                          facet_grid(confirmed.gender ~ event.name) +
+                          geom_vline(xintercept=19) +
+                          geom_abline(intercept=0, slope=1) +
+                          theme(legend.title = element_blank(),
+                                text=element_text(size=14)) +
+                          labs(x="Reported Age",
+                               y="Desired Age at Event",
+                               title="Reported Age vs Desired Age At Milestone")
+
+## Drop older ages
+milestones <- milestones[age<=19]
+
 
 # summary dataset on desire for marriage, children, number of children, and respective ages of events
 child_data <- milestones[key %like% "Baby"]
-child_data[, child.idx:= as.integer(str_extract(key, "[0-9]+"))]
+child_data[, child.idx:= as.integer(str_extract(key, "[0-9]+")) +1]
 child_data[, child.sex:= str_extract(value, "Male|Female")]
 child_data[, age.at.child:= as.integer(str_extract(value, "[0-9]+"))]
 child_data[, c("key", "value", "event.name", "school.code", "event.id"):=NULL]
 child_data[, child.count:= .N, by="user.id"]
+
+## for paper: summary stats on desired sex of first two children, by sex of respondent 
+summary_child_sex <- child_data[child.idx<3, list(count=.N), by=list(child.idx, child.sex, confirmed.gender)]
+summary_child_sex[, tot:=sum(count), by=list(confirmed.gender, child.idx)]
+summary_child_sex[, perc:= count/tot*100]
 
 child_age <- milestones[event.name=="children" & key=="age", list(user.id, child.age=as.integer(value))]
 
 marriage_data <- milestones[event.name=="marriage" & key=="age", list(user.id, confirmed.gender, age, marriage.age=as.integer(value))]
 marriage_data[, wants.marriage:= marriage.age>0]
 
+marriage_data[wants.marriage==T, list(mean(marriage.age)), by=confirmed.gender]
+nomarriage_perc = marriage_data[, list(count=.N), by=list(confirmed.gender, wants.marriage)]
+nomarriage_perc[, tot:= sum(count), by=confirmed.gender]
+
 family_summary <- merge(marriage_data, unique(child_data[, list(user.id, child.count)]), by="user.id", all=T)
 family_summary[is.na(child.count), child.count:=0]
-family_summary[,wants.children:= child.count>0]
 family_summary <- merge(family_summary, child_age, by="user.id", all=T)
-family_summary <- merge(family_summary, child_data[child.idx==0, list(user.id, age.at.first.child=age.at.child)], by="user.id", all=T)
+family_summary <- merge(family_summary, child_data[child.idx==1, list(user.id, age.at.first.child=age.at.child)], by="user.id", all=T)
 family_summary[is.na(age.at.first.child), age.at.first.child:=0]
+family_summary[,wants.children:= child.age>0]
+
+
+## for paper: summary stats on age at marriage and age at first child
+family_summary[wants.marriage==T, list(mean(marriage.age)), by=confirmed.gender]
+nomarriage_perc = family_summary[, list(count=.N), by=list(confirmed.gender, wants.marriage)]
+nomarriage_perc[, tot:= sum(count), by=confirmed.gender]
+
+family_summary[wants.children==T, list(mean(child.age)), by=confirmed.gender]
+nobaby_perc = family_summary[, list(count=.N), by=list(confirmed.gender, wants.children)]
+nobaby_perc[, tot:= sum(count), by=confirmed.gender]
 
 ## Question: What age do people want to get married?
 marriage_age_plot <- ggplot(family_summary, aes(x=marriage.age)) +
                       geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
                       facet_grid(~confirmed.gender) +
                       theme(legend.title = element_blank()) + 
-                      labs(title="Desired Age of Marriage, by Gender",
+                      labs(title="Desired Age of Marriage, by Sex",
                            x="Age",
                            y="Count")
 
@@ -152,7 +196,7 @@ child_age_plot <- ggplot(family_summary, aes(x=child.age)) +
                   geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
                   facet_grid(~confirmed.gender) +
                   theme(legend.title = element_blank()) + 
-                  labs(title="Desired Age at First Child, by Gender",
+                  labs(title="Desired Age at First Child, by Sex",
                        x="Age",
                        y="Count")
 
@@ -160,7 +204,7 @@ child_age_plot_alt <- ggplot(family_summary, aes(x=age.at.first.child)) +
                       geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) +
                       facet_grid(~confirmed.gender) +
                       theme(legend.title = element_blank()) + 
-                      labs(title="Desired Age at First Child, by Gender (Using Timeline)",
+                      labs(title="Desired Age at First Child, by Sex (Using Timeline)",
                            x="Age",
                            y="Count")
 
@@ -173,7 +217,7 @@ child_count_plot <- ggplot(family_summary, aes(x=child.count)) +
                     geom_bar(aes(fill=confirmed.gender, color=confirmed.gender), alpha=0.5) + 
                     facet_grid(~confirmed.gender) +
                     theme(legend.title = element_blank()) + 
-                    labs(title="Desired Number of Children, by Gender",
+                    labs(title="Desired Number of Children, by Sex",
                          x="# of Children",
                          y="Count")
 
@@ -206,6 +250,12 @@ influence_plot <- ggplot(influencers, aes(x=milestone)) +
                   labs(title="Milestone Influencers, by Sex",
                        x="Milestone",
                        y="Count")
+
+
+## table for paper: influencer percent
+influence_perc <- influencers[, list(count=.N), by=list(confirmed.gender, milestone, influencer)]
+influence_perc[, perc:=count/sum(count)*100, by=list(confirmed.gender, milestone)]
+influence_perc <- dcast(influence_perc, confirmed.gender + milestone ~ influencer, value.var = "perc")
 
 ## --------------------------------------------------------------------------------------------------------------
 
@@ -268,7 +318,7 @@ graphics.off()
 
 
 for (plot in plots){
-  png(paste0(main_dir, "prelim_plots/", plot, ".png"), height=900, width=900, units = "px", res=140)
+  png(paste0(main_dir, "prelim_plots/", plot, ".png"), height=900, width=1200, units = "px", res=140)
   print(get(plot))
   graphics.off()
 }
