@@ -112,10 +112,25 @@ fam <- raw[, list(user.id, age, sex,
                   sisters.older, sisters.younger,
                   male.child.count, female.child.count)]
 fam <- melt(fam, id.vars=c("user.id", "age", "sex", "family.type"),
-            measure.vars = list(c("brothers.older", "brothers.younger", "sisters.older", "sisters.younger"),
-                                c("male.child.count", "female.child.count")))
+            measure.vars = c("brothers.older", "brothers.younger", "sisters.older", "sisters.younger", 
+                             "male.child.count", "female.child.count"),
+            variable.name = "type.detail",
+            value.name = "count"
+                                )
 fam[is.na(count), count:=0]
-fam[, tot.sibs:=sum(count), by=c("user.id", "family.type")]
+fam[, type:=ifelse(type.detail %like% "child", "child", "sibling")]
+
+fam_summary <- fam[, list(tot.count=sum(count)),
+                   by=list(user.id, age, sex, family.type, type)]
+fam_summary <- dcast(fam_summary, user.id + age + sex + family.type ~ type)
+
+ggplot(fam_summary[family.type!="" & child <10], aes(x=child, y=sibling)) +
+  geom_point(aes(color=sex)) +
+  facet_grid(sex ~ family.type) +
+  theme(legend.position="none")
+
+
+## plotting -----------------------
 
 plots <- Filter( function(x) 'ggplot' %in% class( get(x) ), ls() )
 
