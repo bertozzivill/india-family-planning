@@ -126,28 +126,21 @@ sex_prior_sum[, tot.sex:= sum(count), by="sex"]
 sex_prior_sum <- sex_prior_sum[order(sex, prior.awareness)]
 sex_prior_sum[, perc:=count/tot.sex*100]
 
-## family
-fam <- raw[, list(user.id, age, sex, 
-                  family.type, brothers.older, brothers.younger,
-                  sisters.older, sisters.younger,
-                  male.child.count, female.child.count)]
-fam <- melt(fam, id.vars=c("user.id", "age", "sex", "family.type"),
-            measure.vars = c("brothers.older", "brothers.younger", "sisters.older", "sisters.younger", 
-                             "male.child.count", "female.child.count"),
-            variable.name = "type.detail",
-            value.name = "count"
-                                )
-fam[is.na(count), count:=0]
-fam[, type:=ifelse(type.detail %like% "child", "child", "sibling")]
+## validation: compare age at first child in questionnaire and game
+load(paste0(main_dir, "marriage_child_age.rdata"))
+child_age_game <- marriage_child_age[event.name=="First Child" & event.age>0, list(user.id, type="In-Game", sex=confirmed.gender, event.age)]
 
-fam_summary <- fam[, list(tot.count=sum(count)),
-                   by=list(user.id, age, sex, family.type, type)]
-fam_summary <- dcast(fam_summary, user.id + age + sex + family.type ~ type)
+child_age_quest <- raw[!is.na(child.1.age), list(type="Questionnaire", user.id, sex, event.age=child.1.age)]
+child_compare <- rbind(child_age_game, child_age_quest)
 
-ggplot(fam_summary[family.type!="" & child <10], aes(x=child, y=sibling)) +
-  geom_point(aes(color=sex)) +
-  facet_grid(sex ~ family.type) +
-  theme(legend.position="none")
+child_age_plot_quest <- ggplot(child_compare, aes(x=event.age)) +
+                        geom_bar(aes(fill=sex, color=sex), alpha=0.75) +
+                        facet_grid(type~sex) +
+                        theme(legend.position="none",
+                              text=element_text(size=14)) + 
+                        labs(title="Age at First Child, Game vs Questionnaire, by Sex",
+                             x="Age",
+                             y="Count")
 
 
 ## plotting -----------------------

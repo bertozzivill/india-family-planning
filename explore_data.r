@@ -189,6 +189,8 @@ age_plot <- ggplot(marriage_child_age, aes(x=event.age)) +
                  x="Age",
                  y="Count")
 
+save(marriage_child_age, file=paste0(main_dir, "marriage_child_age.rdata"))
+
 
 ## Question: how many kids do people want? What Gender?
 child_count_plot <- ggplot(family_summary, aes(x=child.count)) +
