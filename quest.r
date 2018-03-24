@@ -77,34 +77,54 @@ demog_plot_quest  <- ggplot(demog[!is.na(age)], aes(x=age)) +
 ## plot rating of game
 rating <- raw[, list(user.id, sex, liked.game, recommend.friends, improved.knowledge)]
 rating <- melt(rating, id.vars = c("user.id", "sex"))
+rating[, value:=capitalize(value)]
 rating[, value:=factor(value, levels=c("Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"))]
 rating[, variable:= factor(variable, labels=c("Liked Game", "Recommend \n to Friends", "Game Improved \n Knowledge"))]
 
-rate_plot_quest <- ggplot(rating, aes(x=value)) +
+rate_plot_quest <- ggplot(rating[!is.na(value)], aes(x=value)) +
             geom_bar(aes(fill=sex), alpha=0.75) +
             facet_grid(variable~sex) +
             theme(axis.text.x = element_text(angle=45, hjust=1,),
-                  legend.position="none") +
+                  legend.position="none",
+                  text=element_text(size=14)) +
             labs(x="",
                  y="Count",
                  title="Post-Game Questionnaire: \n Ratings and Knowledge Gain")
 
+rating_sum <- rating[!is.na(value), list(count=.N), by=list(variable, value)]
+rating_sum[, tot.count:= sum(count), by="variable"]
+rating_sum[, perc:= count/tot.count*100]
+
 ## prior knowledge 
-prior <- raw[, list(user.id, sex, prior.awareness)]
+prior <- raw[, list(user.id, sex, prior.awareness, improved.knowledge)]
+prior[prior.awareness=="Everything was new", prior.awareness:="<25%"]
+prior[, knowledge.sum:= ifelse(improved.knowledge %in% c("Agree", "Strongly agree"), "Knowledge Gained: \n Agree or Strongly Agree",
+                               "Knowledge Gained: \n Disagree or Neutral")]
+prior[, improved.knowledge:=factor(improved.knowledge, levels=c("Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"))]
 prior[, prior.awareness:=factor(prior.awareness, 
-                                levels=c("Everything was new", 
-                                         "<25%",
+                                levels=c("<25%",
                                          "25-50%",
                                          "51-75%",
                                          "76-100%"))]
-prior_plot_quest <- ggplot(prior, aes(x=prior.awareness)) +
+prior_plot_quest <- ggplot(prior[!is.na(prior.awareness) & !is.na(improved.knowledge)], aes(x=prior.awareness)) +
                       geom_bar(aes(fill=sex), alpha=0.75) +
-                      facet_grid(~sex) +
+                      facet_grid(knowledge.sum~sex) +
                       theme(axis.text.x = element_text(angle=45, hjust=1),
-                            legend.position = "none") +
+                            legend.position = "none",
+                            text=element_text(size=14)) +
                       labs(x="",
                            y="Count",
-                           title="Post-Game Questionnaire: \n Prior Knowledge")
+                           title="Post-Game Questionnaire: \n Prior Knowledge of Material, by Knowledge Gained in Game")
+
+prior_sum <- prior[!is.na(prior.awareness) & !is.na(improved.knowledge), list(count=.N), by=list(knowledge.sum, prior.awareness, sex)]
+prior_sum[, list(count=sum(count)), by="prior.awareness"]
+sex_prior_sum <- prior_sum[knowledge.sum %like% "Agree", list(count=sum(count)), by=list(sex, prior.awareness)]
+both_sex_sum <-  prior_sum[knowledge.sum %like% "Agree", list(count=sum(count)), by=list(prior.awareness)]
+both_sex_sum[, sex:= "Both"]
+sex_prior_sum <- rbind(sex_prior_sum, both_sex_sum)
+sex_prior_sum[, tot.sex:= sum(count), by="sex"]
+sex_prior_sum <- sex_prior_sum[order(sex, prior.awareness)]
+sex_prior_sum[, perc:=count/tot.sex*100]
 
 ## family
 fam <- raw[, list(user.id, age, sex, 
@@ -145,7 +165,7 @@ graphics.off()
 
 
 for (plot in plots){
-  png(paste0(main_dir, "prelim_plots/", plot, ".png"), height=900, width=1200, units = "px", res=140)
+  png(paste0(main_dir, "prelim_plots/", plot, ".png"), height=900, width=900, units = "px", res=140)
   print(get(plot))
   graphics.off()
 }
