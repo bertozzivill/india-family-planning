@@ -177,7 +177,7 @@ influence_perc <- dcast(influence_perc, confirmed.gender + milestone ~ influence
 plots <- Filter( function(x) 'ggplot' %in% class( get(x) ), ls() )
 
 
-pdf(paste0(in_dir, "game_plots.pdf"), width=11, height=8.5)
+pdf(paste0(in_dir, "plots/game_plots.pdf"), width=11, height=8.5)
 
 for (plot in plots){
   print(get(plot))

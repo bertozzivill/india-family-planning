@@ -18,7 +18,7 @@ theme_set(theme_minimal())
 
 in_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/family_planning_game/data_for_open_access/"
 raw <- fread(paste0(in_dir, "questionnaire.csv"))
-marriage_child_age <- load(paste0(in_dir, "marriage_child_age.csv"))
+marriage_child_age <- fread(paste0(in_dir, "marriage_child_age.csv"))
 raw <- raw[sex!=""]
 
 ## plot age and sex
@@ -26,7 +26,8 @@ demog <- raw[, list(user.id, age, sex)]
 demog_plot_quest  <- ggplot(demog[!is.na(age)], aes(x=age)) +
   geom_bar(aes(fill=sex), alpha=0.75) +
   facet_grid(~sex) +
-  theme(legend.position = "none")+
+  theme(legend.position = "none",
+        text=element_text(size=14))+
   labs(x="",
        y="Count",
        title="Post-Game Questionnaire: \n Self-Reported Age and Sex")
@@ -72,7 +73,7 @@ prior_plot_quest <- ggplot(prior[!is.na(prior.awareness) & !is.na(improved.knowl
         text=element_text(size=14)) +
   labs(x="",
        y="Count",
-       title="Post-Game Questionnaire: \n Prior Knowledge of Material, by Knowledge Gained in Game")
+       title="Post-Game Questionnaire: \n Prior Knowledge of Material, \n by Knowledge Gained in Game")
 
 prior_sum <- prior[!is.na(prior.awareness) & !is.na(improved.knowledge), list(count=.N), by=list(knowledge.sum, prior.awareness, sex)]
 prior_sum[, list(count=sum(count)), by="prior.awareness"]
@@ -104,7 +105,7 @@ child_age_plot_quest <- ggplot(child_compare, aes(x=event.age)) +
 
 plots <- Filter( function(x) 'ggplot' %in% class( get(x) ), ls() )
 
-pdf(paste0(in_dir, "quest_plots.pdf"), width=11, height=8.5)
+pdf(paste0(in_dir, "plots/quest_plots.pdf"), width=11, height=8.5)
 
 for (plot in plots){
   print(get(plot))
@@ -112,7 +113,7 @@ for (plot in plots){
 graphics.off()
 
 for (plot in plots){
-  png(paste0(main_dir, "plots/", plot, ".png"), height=900, width=900, units = "px", res=140)
+  png(paste0(in_dir, "plots/", plot, ".png"), height=900, width=900, units = "px", res=140)
   print(get(plot))
   graphics.off()
 }
