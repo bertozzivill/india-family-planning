@@ -2,8 +2,10 @@
 ## analyze_questionnaire.r
 ## Author: Amelia Bertozzi-Villa
 ## Date: April 15th 2018
-## Description: Make descriptive plots and tables included in game analysis.  
-## -----------------------------------------------------------------------------------------------------
+## Description: Make descriptive plots and tables from post-game questionnaire. 
+##              NOTE: In order for this script to run successfully you must first run "analyze_game_data.r"
+##                    to generate the file "marriage_child_age.csv".
+## --------------------------------------------------------------------------------------------------------
 
 library(data.table)
 library(ggplot2)
@@ -86,7 +88,7 @@ sex_prior_sum <- sex_prior_sum[order(sex, prior.awareness)]
 sex_prior_sum[, perc:=count/tot.sex*100]
 
 ## validation: compare age at first child in questionnaire and game
-child_age_game <- marriage_child_age[event.name=="First Child" & event.age>0, list(user.id, type="In-Game", sex=confirmed.gender, event.age)]
+child_age_game <- marriage_child_age[event.name=="First Child" & event.age>0, list(user.id, type="In-Game", sex=confirmed.sex, event.age)]
 
 child_age_quest <- raw[!is.na(child.1.age), list(type="Questionnaire", user.id, sex, event.age=child.1.age)]
 child_compare <- rbind(child_age_game, child_age_quest)
@@ -101,7 +103,7 @@ child_age_plot_quest <- ggplot(child_compare, aes(x=event.age)) +
        y="Count")
 
 
-## plotting -----------------------
+## save plots -----------------------
 
 plots <- Filter( function(x) 'ggplot' %in% class( get(x) ), ls() )
 
