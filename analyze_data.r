@@ -94,6 +94,11 @@ family_summary <- merge(family_summary, child_data[child.idx==1, list(user.id, a
 family_summary[is.na(age.at.first.child), age.at.first.child:=0]
 family_summary[,wants.children:= child.age>0]
 
+## for paper: means and standard errors for age at marriage/children
+family_summary[, list(mean.marriage.age =mean(marriage.age)), by=list(confirmed.gender, wants.marriage)]
+family_summary[, list(mean.child.age =mean(child.age)), by=list(confirmed.gender, wants.children)]
+family_summary[, list(sd.marriage.age =sd(marriage.age)), by=list(confirmed.gender, wants.marriage)]
+family_summary[, list(sd.child.age =sd(child.age)), by=list(confirmed.gender, wants.children)]
 
 ## for paper: summary stats on age at marriage and age at first child
 family_summary[wants.marriage==T, list(mean(marriage.age)), by=confirmed.gender]

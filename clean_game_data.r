@@ -48,13 +48,13 @@ valid_users <- unique(milestone_events$user.id)
 # Merge two datasets 
 all_data <- merge(event_data, events, by="event.id", all=T)
 all_data <- all_data[user.id %in% valid_users]
-
+setcolorder(all_data, c("device.id", "user.id", "event.id", "event.type", "event.name", "key", "value", "timestamp"))
 write.csv(all_data, file=paste0(out_dir, "all_game_data.csv"), row.names = F)
 
 # Demographics Datatset (note: includes one student who started game multiple times)
 demog <- dcast(all_data[event.type=="DE"], user.id + event.id ~ key, value.var = "value")
 demog[, age:=as.integer(age)]
-setnames(demog, c("confirmed gender", "gender", "school code"), c("confirmed.gender", "self.report.gender", "school.code"))
+setnames(demog, c("confirmed gender", "gender", "school code"), c("confirmed.sex", "self.report.sex", "school.code"))
 demog[, school.code:=as.integer(school.code)]
 write.csv(demog, file=paste0(out_dir, "demog.csv"), row.names = F)
 
@@ -63,7 +63,7 @@ milestones <- all_data[event.type=="MI", list(user.id, event.id, event.name, key
 write.csv(milestones, file=paste0(out_dir, "milestones.csv"), row.names = F)
 
 # Minigame Dataset
-minigames <- all_data[event.type=="MG", list(user.id, device.id, event.id, event.name, key, value, timestamp)]
+minigames <- all_data[event.type=="MG"]
 write.csv(minigames, file=paste0(out_dir, "minigames.csv"), row.names = F)
 
 ## 2: Post-Game Questionnaire (paper) -------------------------------------------------------------------
@@ -118,6 +118,7 @@ questionnaire <- questionnaire[, list(user.id, age, sex,
                                       male.child.count, female.child.count, child.1.age, child.2.age, child.3.age, child.4.age,
                                       liked.game, recommend.friends, improved.knowledge, want.more.family.planning.games,
                                       helped.plan.future, want.more.health.games, prior.awareness, other.health.topics, other.comments)]
+questionnaire[questionnaire==""] <- NA
 write.csv(questionnaire, file=paste0(out_dir, "questionnaire.csv"), row.names = F)
 
 
