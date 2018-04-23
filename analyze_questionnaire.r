@@ -86,6 +86,8 @@ sex_prior_sum <- rbind(sex_prior_sum, both_sex_sum)
 sex_prior_sum[, tot.sex:= sum(count), by="sex"]
 sex_prior_sum <- sex_prior_sum[order(sex, prior.awareness)]
 sex_prior_sum[, perc:=count/tot.sex*100]
+prior_sum <- prior_sum[, list(count=sum(count)), by="prior.awareness"]
+prior_sum[, perc:= count/sum(count)*100]
 
 ## validation: compare age at first child in questionnaire and game
 child_age_game <- marriage_child_age[event.name=="First Child" & event.age>0, list(user.id, type="In-Game", sex=confirmed.sex, event.age)]
