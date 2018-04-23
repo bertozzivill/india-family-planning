@@ -132,7 +132,7 @@ age_plot <- ggplot(marriage_child_age, aes(x=event.age)) +
 write.csv(marriage_child_age, file=paste0(in_dir, "marriage_child_age.csv"), row.names=F)
 
 ## Plot: how many kids do people want? What Sex?
-child_count_plot <- ggplot(family_summary, aes(x=child.count)) +
+child_count_plot <- ggplot(family_summary[child.count>0], aes(x=child.count)) +
                     geom_bar(aes(fill=confirmed.sex, color=confirmed.sex), alpha=0.75) + 
                     facet_grid(~confirmed.sex) +
                     theme(legend.position="none",
@@ -143,6 +143,15 @@ child_count_plot <- ggplot(family_summary, aes(x=child.count)) +
 
 child_data[, confirmed.sex:= paste(confirmed.sex, "Respondent")]
 child_data[, child.sex:= paste(child.sex, "Child")]
+
+## for paper: respondent count by number of children
+parity_counts <- unique(child_data[, list(user.id, confirmed.sex, child.count)])
+parity_counts <- parity_counts[, list(count=.N), by=list(confirmed.sex, child.count)]
+parity_counts <- parity_counts[order(confirmed.sex, child.count)]
+parity_counts[, sex.count:=sum(count), by="confirmed.sex"]
+parity_counts[, sex.perc:=count/sex.count*100]
+
+
 
 child_sex_plot <- ggplot(child_data, aes(x=child.idx)) +
                     geom_bar(aes(fill=child.sex, color=child.sex), alpha=0.75) +
