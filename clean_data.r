@@ -15,19 +15,23 @@ library(data.table)
 
 rm(list=ls())
 
-in_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/family_planning_game/pilot_data/"
-out_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/family_planning_game/data_for_open_access/"
+in_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/my_future_family/chennai_2018/data_030818"
+out_dir <- file.path(in_dir, "clean")
+
+##NOTES: 
+## - need keys for what pre-post game q's and correct a's are
+## - in future, ask to have different event.ids for pre- and post game quiz
 
 ## 1: In-game data (from tablets)----------------------------------------------------------------------------------
 
 # 'events': time, device, and description of each event recorded in the game. One line per event. 
-events <- fread(paste0(in_dir, "mff_study_events.csv"))
+events <- fread(file.path(in_dir, "events.csv"))
 setnames(events, c("event.id", "old.user.id", "event.name", "event.type", "device.id", "timestamp"))
 
 # 'event_data': records the actual outcome of each event. 
 # e.g.: the first event id is "Puberty game Female End". This has 8 associated lines in "event_data" 
 #       describing completion statistics and timings of components within that event.
-event_data <- fread(paste0(in_dir, "mff_study_eventdata.csv"))
+event_data <- fread(file.path(in_dir, "eventdata.csv"))
 setnames(event_data, c("event.id", "key", "value"))
 
 # make more usable user ids 
@@ -49,22 +53,33 @@ valid_users <- unique(milestone_events$user.id)
 all_data <- merge(event_data, events, by="event.id", all=T)
 all_data <- all_data[user.id %in% valid_users]
 setcolorder(all_data, c("device.id", "user.id", "event.id", "event.type", "event.name", "key", "value", "timestamp"))
+all_data[event.name=="Pre Quiz", event.type:="PRQZ"]
+all_data[event.name=="Post Quiz", event.type:="POQZ"]
 write.csv(all_data, file=paste0(out_dir, "all_game_data.csv"), row.names = F)
 
-# Demographics Datatset (note: includes one student who started game multiple times)
+# Demographics Datatset
 demog <- dcast(all_data[event.type=="DE"], user.id + event.id ~ key, value.var = "value")
 demog[, age:=as.integer(age)]
+# note: lots of missingness in confirmed sex, school code
 setnames(demog, c("confirmed gender", "gender", "school code"), c("confirmed.sex", "self.report.sex", "school.code"))
 demog[, school.code:=as.integer(school.code)]
-write.csv(demog, file=paste0(out_dir, "demog.csv"), row.names = F)
+write.csv(demog, file=file.path(out_dir, "demog.csv"), row.names = F)
 
 # Milestone Dataset
 milestones <- all_data[event.type=="MI", list(user.id, event.id, event.name, key, value)]
-write.csv(milestones, file=paste0(out_dir, "milestones.csv"), row.names = F)
+write.csv(milestones, file=file.path(out_dir, "milestones.csv"), row.names = F)
 
 # Minigame Dataset
 minigames <- all_data[event.type=="MG"]
-write.csv(minigames, file=paste0(out_dir, "minigames.csv"), row.names = F)
+write.csv(minigames, file=file.path(out_dir, "minigames.csv"), row.names = F)
+
+# Pre-post dataset
+prepost <- all_data[event.type %like% "QZ"]
+write.csv(prepost, file=file.path(out_dir, "prepost.csv"), row.names = F)
+
+# quick analysis
+test <- dcast(prepost, user.id +  key ~ event.type, value.var = "value")
+test[POQZ==PRQZ]
 
 ## 2: Post-Game Questionnaire (paper) -------------------------------------------------------------------
 
