@@ -15,7 +15,7 @@ library(data.table)
 
 rm(list=ls())
 
-in_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/my_future_family/chennai_2018/data_030818"
+in_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/my_future_family/chennai_2018/data_090818"
 out_dir <- file.path(in_dir, "clean")
 
 ##NOTES: 
@@ -55,7 +55,7 @@ all_data <- all_data[user.id %in% valid_users]
 setcolorder(all_data, c("device.id", "user.id", "event.id", "event.type", "event.name", "key", "value", "timestamp"))
 all_data[event.name=="Pre Quiz", event.type:="PRQZ"]
 all_data[event.name=="Post Quiz", event.type:="POQZ"]
-write.csv(all_data, file=paste0(out_dir, "all_game_data.csv"), row.names = F)
+write.csv(all_data, file=file.path(out_dir, "all_game_data.csv"), row.names = F)
 
 # Demographics Datatset
 demog <- dcast(all_data[event.type=="DE"], user.id + event.id ~ key, value.var = "value")
@@ -74,66 +74,71 @@ minigames <- all_data[event.type=="MG"]
 write.csv(minigames, file=file.path(out_dir, "minigames.csv"), row.names = F)
 
 # Pre-post dataset
+answers <- fread(file.path(in_dir, "quiz_key.csv"))
 prepost <- all_data[event.type %like% "QZ"]
+prepost <- merge(prepost, answers, by="key", all=T)
 write.csv(prepost, file=file.path(out_dir, "prepost.csv"), row.names = F)
 
-# quick analysis
-test <- dcast(prepost, user.id +  key ~ event.type, value.var = "value")
-test[POQZ==PRQZ]
 
 ## 2: Post-Game Questionnaire (paper) -------------------------------------------------------------------
 
-questionnaire <- fread(paste0(in_dir, "questionnaire.csv"))
+quest_fname <- file.path(in_dir, "questionnaire.csv")
 
-newlabels <- c("user.id",
-               "school.code",
-               "eval.date",
-               "educ.level",
-               "age",
-               "school.name",
-               "sex",
-               "residence",
-               "education.medium",
-               "fav.subj.science",
-               "fav.subj.social.science",
-               "fav.subj.language",
-               "fav.subj.other",
-               "hometown",
-               "family.type",
-               "brothers.older",
-               "brothers.younger",
-               "sisters.older",
-               "sisters.younger",
-               "occ.father",
-               "educ.father",
-               "occ.mother",
-               "educ.mother",
-               "religion",
-               "future.career",
-               "male.child.count",
-               "female.child.count",
-               "child.1.age",
-               "child.2.age",
-               "child.3.age",
-               "child.4.age",
-               "liked.game",
-               "recommend.friends",
-               "improved.knowledge",
-               "want.more.family.planning.games",
-               "helped.plan.future",
-               "want.more.health.games",
-               "prior.awareness",
-               "other.health.topics",
-               "other.comments",
-               "complete")
-
-names(questionnaire) <- newlabels
-
-questionnaire <- questionnaire[, list(user.id, age, sex,
-                                      male.child.count, female.child.count, child.1.age, child.2.age, child.3.age, child.4.age,
-                                      liked.game, recommend.friends, improved.knowledge, want.more.family.planning.games,
-                                      helped.plan.future, want.more.health.games, prior.awareness, other.health.topics, other.comments)]
-questionnaire[questionnaire==""] <- NA
-write.csv(questionnaire, file=paste0(out_dir, "questionnaire.csv"), row.names = F)
+if (file.exists(quest_fname)){
+  questionnaire <- fread(quest_fname)
+  
+  newlabels <- c("user.id",
+                 "school.code",
+                 "eval.date",
+                 "educ.level",
+                 "age",
+                 "school.name",
+                 "sex",
+                 "residence",
+                 "education.medium",
+                 "fav.subj.science",
+                 "fav.subj.social.science",
+                 "fav.subj.language",
+                 "fav.subj.other",
+                 "hometown",
+                 "family.type",
+                 "brothers.older",
+                 "brothers.younger",
+                 "sisters.older",
+                 "sisters.younger",
+                 "occ.father",
+                 "educ.father",
+                 "occ.mother",
+                 "educ.mother",
+                 "religion",
+                 "future.career",
+                 "male.child.count",
+                 "female.child.count",
+                 "child.1.age",
+                 "child.2.age",
+                 "child.3.age",
+                 "child.4.age",
+                 "liked.game",
+                 "recommend.friends",
+                 "improved.knowledge",
+                 "want.more.family.planning.games",
+                 "helped.plan.future",
+                 "want.more.health.games",
+                 "prior.awareness",
+                 "other.health.topics",
+                 "other.comments",
+                 "complete")
+  
+  names(questionnaire) <- newlabels
+  
+  questionnaire <- questionnaire[, list(user.id, age, sex,
+                                        male.child.count, female.child.count, child.1.age, child.2.age, child.3.age, child.4.age,
+                                        liked.game, recommend.friends, improved.knowledge, want.more.family.planning.games,
+                                        helped.plan.future, want.more.health.games, prior.awareness, other.health.topics, other.comments)]
+  questionnaire[questionnaire==""] <- NA
+  write.csv(questionnaire, file=paste0(out_dir, "questionnaire.csv"), row.names = F)
+  
+  
+}
 
 
