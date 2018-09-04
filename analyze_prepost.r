@@ -34,6 +34,9 @@ data[, event.name:=tolower(gsub(" Quiz", "", event.name))]
 # todo: check male/female #s in dataset compared to reported above 
 data <- dcast(data, user.id + question.count + question + correct_answer ~ event.name, value.var=c("value", "timestamp"))
 
+# remove questions greater than 14
+data <- data[question.count<=14]
+
 # check numbers: compare reported with dataset
 # total students in dataset:
 length(unique(data$user.id))
@@ -45,7 +48,7 @@ counts <- unique(data[, list(user.id, date)])
 counts[, count:=.N, by="date"]
 
 # only keep data from three reported dates: July 30, August 1, August 4
-data <- data[date %in% c("30-07", "01-08", "04-08")]
+# data <- data[date %in% c("30-07", "01-08", "04-08")]
 ## don't add up-- does it matter? 
 
 complete <- data[!is.na(value_post) & !is.na(value_pre)]
