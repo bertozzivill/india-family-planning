@@ -5,12 +5,13 @@
 ## Description: Analyze pre-post test from MFF game pilot in Chennai
 
 ## School info: 
-# 1.30th July sunshine Academy 28 boys 24 girls.
-# 2. Aug.1st .kendriya vidyala Tambaram 105 boys 125 girls. 
-# 3. Aug.4th. St.Vincent 78 boys 69 girls.
+# 1.30th July sunshine Academy 28 boys 24 girls. -> 52
+# 2. Aug.1st .kendriya vidyala Tambaram 105 boys 125 girls.  -> 130
+# 3. Aug.4th. St.Vincent 78 boys 69 girls. -> 147
 
 ## Hours: 
-## 9/2 4:30-
+## 9/2 4:30-6
+## 9/3 7-
 ## -----------------------------------------------------------------------------------------------------
 
 library(data.table)
@@ -32,6 +33,20 @@ data[, event.name:=tolower(gsub(" Quiz", "", event.name))]
 # todo: standardize column naming
 # todo: check male/female #s in dataset compared to reported above 
 data <- dcast(data, user.id + question.count + question + correct_answer ~ event.name, value.var=c("value", "timestamp"))
+
+# check numbers: compare reported with dataset
+# total students in dataset:
+length(unique(data$user.id))
+
+# count by date
+data[, date:= ifelse(is.na(timestamp_pre), format(as.Date(timestamp_post), "%d-%m"), format(as.Date(timestamp_pre), "%d-%m"))]
+
+counts <- unique(data[, list(user.id, date)])
+counts[, count:=.N, by="date"]
+
+# only keep data from three reported dates: July 30, August 1, August 4
+data <- data[date %in% c("30-07", "01-08", "04-08")]
+## don't add up-- does it matter? 
 
 complete <- data[!is.na(value_post) & !is.na(value_pre)]
 
