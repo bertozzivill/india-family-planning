@@ -54,8 +54,7 @@ counts[, count:=.N, by="date"]
 complete <- data[!is.na(value_post) & !is.na(value_pre)]
 
 # time elapsed between pre and post
-complete[, elapsed_seconds:= as.numeric(difftime(timestamp_post, timestamp_pre))]
-complete[, elapsed_minutes:= elapsed_seconds/60]
+complete[, elapsed_minutes:= as.numeric(difftime(timestamp_post, timestamp_pre, units="mins"))]
 ggplot(complete[elapsed_minutes<500], aes(x=elapsed_minutes)) + geom_density() + geom_vline(xintercept=4, color="red")
 
 # based on this, drop everyone with less than 4 or more than 50 minutes between tests
@@ -69,7 +68,7 @@ complete[value_pre=="Fallopian Tube", value_pre:="Fallopian Tubes"]
 complete[value_post=="Fallopian Tube", value_post:="Fallopian Tubes"]
 
 # calculate scores
-complete[, c("elapsed_seconds", "elapsed_minutes"):=NULL]
+complete[, c("elapsed_minutes"):=NULL]
 complete[, score_pre:=100*sum(value_pre==correct_answer)/14, by="user.id"]
 complete[, score_post:=100*sum(value_post==correct_answer)/14, by="user.id"]
 complete[, score_gain:=score_post-score_pre]
