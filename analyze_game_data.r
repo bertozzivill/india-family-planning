@@ -17,41 +17,55 @@ rm(list=ls())
 theme_set(theme_minimal())
 
 ## load data 
-in_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/family_planning_game/data_for_open_access/"
+in_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/my_future_family/chennai_2018/data_090818/clean/"
 
-milestones <- fread(paste0(in_dir, "milestones.csv"))
-demog <- fread(paste0(in_dir, "demog.csv")) 
+milestones <- fread(file.path(in_dir, "milestones.csv"))
+demog <- fread(file.path(in_dir, "demog.csv")) 
+
+## remove some values where they were still playing the old game
+demog <- demog[self.report.sex %in% c("male", "female")]
+demog <- demog[, list(user.id, event.id, age, self.report.sex)]
 
 ## Age distribution by sex
 age_dist <- ggplot(demog, aes(x=age)) +
-            geom_bar(aes(fill=confirmed.sex, color=confirmed.sex), alpha=0.7) +
-            facet_grid(~confirmed.sex) +
+            geom_bar(aes(fill=self.report.sex, color=self.report.sex), alpha=0.7) +
+            facet_grid(~self.report.sex) +
             theme(legend.title = element_blank()) +
-            labs(title="Distributions of Reported Age, by Confirmed Sex",
+            labs(title="Distributions of Reported Age, by Sex",
                  x="Reported Age",
                  y="Count")
 
 
 ##  Milestone analysis ---------------------------------------------------------------------------------------------
 
-milestones <- merge(milestones, demog[, list(user.id, age, confirmed.sex, self.report.sex, school.code)], 
-                    by="user.id", all.x=T)
+milestones <- merge(milestones, demog[, list(user.id, age, self.report.sex)], 
+                    by="user.id", all.y=T)
 
-# user 66 has no demographic data; drop
-milestones <- milestones[!is.na(age)]
 
 # plot before dropping older ages: what age do people want marriage/children, compared to their self-reported age?
-age_comparison <- milestones[event.name %in% c("children", "marriage") & key=="age"]
-age_comparison[, age.at.event:=as.integer(value)]
+
+marriage_age <- milestones[event.name=="marriage" & key=="age"]
+marriage_age[, age.at.event:=as.integer(value)]
+marriage_age <- marriage_age[, list(user.id, event.name, self.report.sex, age, age.at.event)]
+
+children_age <- milestones[event.name =="children" & key=="baby"] 
+children_age[, child.sex:= gsub(" .*", "", value)]
+children_age[, child.age:=as.integer(gsub(".* ", "", value))]
+
+first_child_age <- children_age[, list(age.at.event=min(child.age)), 
+                                by=list(user.id, event.name, self.report.sex, age)]
+
+age_comparison <- rbind(marriage_age, first_child_age)
+
 age_comparison[, event.name := ifelse(event.name=="children", "First Child", "Marriage")]
-age_comparison <- age_comparison[, list(count=.N), by=list(event.name, confirmed.sex, 
+age_comparison <- age_comparison[, list(count=.N), by=list(event.name, self.report.sex, 
                                                            age, age.at.event)]
 age_comparison[, event.name:=factor(event.name, levels=c("Marriage", "First Child"))]
 
 age_milestone_compare <- ggplot(age_comparison[age.at.event>0], aes(x=age, y=age.at.event)) +
-                          geom_point(aes(color=confirmed.sex, size=count), alpha=0.75) +
+                          geom_point(aes(color=self.report.sex, size=count), alpha=0.75) +
                           scale_color_discrete(guide=FALSE) + 
-                          facet_grid(event.name ~ confirmed.sex) +
+                          facet_grid(event.name ~ self.report.sex) +
                           geom_vline(xintercept=19) +
                           geom_abline(intercept=0, slope=1) +
                           theme(legend.title = element_blank(),
@@ -60,9 +74,10 @@ age_milestone_compare <- ggplot(age_comparison[age.at.event>0], aes(x=age, y=age
                                y="Desired Age at Event",
                                title="Reported Age vs Desired Age At Milestone")
 
-## Drop ages not within 13-19 and sex mismatches
+
+
+## Drop ages not within 13-19 
 milestones <- milestones[age>=13 & age<=19]
-milestones <- milestones[self.report.sex==confirmed.sex]
 
 # summary dataset on desire for marriage, children, number of children, and respective ages of events
 child_data <- milestones[key %like% "Baby"]
