@@ -50,9 +50,9 @@ marriage_age <- marriage_age[, list(user.id, event.name, self.report.sex, age, a
 
 children_age <- milestones[event.name =="children" & key=="baby"] 
 children_age[, child.sex:= gsub(" .*", "", value)]
-children_age[, child.age:=as.integer(gsub(".* ", "", value))]
+children_age[, age.at.child:=as.integer(gsub(".* ", "", value))]
 
-first_child_age <- children_age[, list(age.at.event=min(child.age)), 
+first_child_age <- children_age[, list(age.at.event=min(age.at.child)), 
                                 by=list(user.id, event.name, self.report.sex, age)]
 
 age_comparison <- rbind(marriage_age, first_child_age)
@@ -78,29 +78,24 @@ age_milestone_compare <- ggplot(age_comparison[age.at.event>0], aes(x=age, y=age
 
 ## Drop ages not within 13-19 
 milestones <- milestones[age>=13 & age<=19]
+children_age <- children_age[age>=13 & age <=19]
+children_age <- children_age[order(user.id, age.at.child)]
+first_child_age <- first_child_age[age>=13 & age<=19]
+marriage_age <- marriage_age[age>=13 & age<=19]
 
 # summary dataset on desire for marriage, children, number of children, and respective ages of events
-child_data <- milestones[key %like% "Baby"]
-child_data[, child.idx:= as.integer(str_extract(key, "[0-9]+")) +1]
-child_data[, child.sex:= str_extract(value, "Male|Female")]
-child_data[, age.at.child:= as.integer(str_extract(value, "[0-9]+"))]
-child_data[, c("key", "value", "event.name", "school.code", "event.id"):=NULL]
-child_data[, child.count:= .N, by="user.id"]
+children_age[, child.idx:= rowid(user.id)]
+children_age[, c("key", "value", "event.name", "event.id"):=NULL]
+children_age[, child.count:= .N, by="user.id"]
 
 ## for paper: summary stats on desired sex of first two children, by sex of respondent 
-summary_child_sex <- child_data[child.idx<3, list(count=.N), by=list(child.idx, child.sex, confirmed.sex)]
-summary_child_sex[, tot:=sum(count), by=list(confirmed.sex, child.idx)]
+summary_child_sex <- children_age[child.idx<3, list(count=.N), by=list(child.idx, child.sex, self.report.sex)]
+summary_child_sex[, tot:=sum(count), by=list(self.report.sex, child.idx)]
 summary_child_sex[, perc:= count/tot*100]
 
-child_age <- milestones[event.name=="children" & key=="age", list(user.id, child.age=as.integer(value))]
-
-## Important note: There are two separate metrics for "age at first child" in the data. Players were asked explicitly at what age they wanted to 
-##                 have children (here denoted by 'child.age'), but also recorded their own age when they described the characteristics of 
-##                 their first child (here, 'age.at.first.child'). Both are preserved in the dataset, but 'child.age' was used for plotting 
-##                 and analysis. Future versions of the game will remove this ambiguity. 
 
 ## Marriage/family size descriptions 
-marriage_data <- milestones[event.name=="marriage" & key=="age", list(user.id, confirmed.sex, age, marriage.age=as.integer(value))]
+marriage_data <- milestones[event.name=="marriage" & key=="age", list(user.id, self.report.sex, age, marriage.age=as.integer(value))]
 marriage_data[, wants.marriage:= marriage.age>0]
 marriage_data[wants.marriage==T, list(mean(marriage.age)), by=confirmed.sex]
 nomarriage_perc = marriage_data[, list(count=.N), by=list(confirmed.sex, wants.marriage)]
