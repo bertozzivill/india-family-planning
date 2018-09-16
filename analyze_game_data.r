@@ -19,6 +19,7 @@ theme_set(theme_minimal())
 ## load data 
 in_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/my_future_family/chennai_2018/data_090818/clean/"
 
+all_data <- fread(file.path(in_dir, "all_game_data.csv"))
 milestones <- fread(file.path(in_dir, "milestones.csv"))
 demog <- fread(file.path(in_dir, "demog.csv")) 
 
@@ -42,15 +43,30 @@ milestones <- merge(milestones, demog[, list(user.id, age, self.report.sex)],
                     by="user.id", all.y=T)
 
 
-# plot before dropping older ages: what age do people want marriage/children, compared to their self-reported age?
-
+# format data about age and number of marriage and children
 marriage_age <- milestones[event.name=="marriage" & key=="age"]
-marriage_age[, age.at.event:=as.integer(value)]
-marriage_age <- marriage_age[, list(user.id, event.name, self.report.sex, age, age.at.event)]
+marriage_age <- marriage_age[, list(user.id, self.report.sex, age, wants.marriage=T, marriage.age=as.integer(value))]
+
+no_marriage_age <- milestones[event.name=="marriage" & key=="skip" & value=="yes",
+                              list(user.id, self.report.sex, age, wants.marriage=F, marriage.age=NA)]
+marriage_data <- rbind(marriage_age, no_marriage_age)
 
 children_age <- milestones[event.name =="children" & key=="baby"] 
 children_age[, child.sex:= gsub(" .*", "", value)]
 children_age[, age.at.child:=as.integer(gsub(".* ", "", value))]
+children_age[, child.idx:= rowid(user.id)]
+children_age[, child.count:= .N, by="user.id"]
+children_age <- children_age[, list(user.id, self.report.sex, age, wants.children=T, 
+                                    child.count, child.sex, age.at.child, child.idx)]
+
+no_children_age <- milestones[event.name=="children" & key=="skip" & value=="yes",
+                              list(user.id, self.report.sex, age, wants.children=F, 
+                                   child.count=NA, child.sex=NA, age.at.child=NA, child.idx=NA)]
+
+children_data <- rbind(children_age, no_children_age)
+
+family_data <- merge(marriage_data, children_data, by=c("user.id", "self.report.sex", "age"), all=T)
+
 
 first_child_age <- children_age[, list(age.at.event=min(age.at.child)), 
                                 by=list(user.id, event.name, self.report.sex, age)]
@@ -82,11 +98,10 @@ children_age <- children_age[age>=13 & age <=19]
 children_age <- children_age[order(user.id, age.at.child)]
 first_child_age <- first_child_age[age>=13 & age<=19]
 marriage_age <- marriage_age[age>=13 & age<=19]
+setnames(marriage_age, "age.at.event", "marriage.age")
+marriage_age[, "event.name":=NULL]
 
 # summary dataset on desire for marriage, children, number of children, and respective ages of events
-children_age[, child.idx:= rowid(user.id)]
-children_age[, c("key", "value", "event.name", "event.id"):=NULL]
-children_age[, child.count:= .N, by="user.id"]
 
 ## for paper: summary stats on desired sex of first two children, by sex of respondent 
 summary_child_sex <- children_age[child.idx<3, list(count=.N), by=list(child.idx, child.sex, self.report.sex)]
@@ -95,13 +110,7 @@ summary_child_sex[, perc:= count/tot*100]
 
 
 ## Marriage/family size descriptions 
-marriage_data <- milestones[event.name=="marriage" & key=="age", list(user.id, self.report.sex, age, marriage.age=as.integer(value))]
-marriage_data[, wants.marriage:= marriage.age>0]
-marriage_data[wants.marriage==T, list(mean(marriage.age)), by=confirmed.sex]
-nomarriage_perc = marriage_data[, list(count=.N), by=list(confirmed.sex, wants.marriage)]
-nomarriage_perc[, tot:= sum(count), by=confirmed.sex]
-
-family_summary <- merge(marriage_data, unique(child_data[, list(user.id, child.count)]), by="user.id", all=T)
+family_summary <- merge(marriage_age, unique(children_age[, list(user.id, child.count)]), by="user.id", all=T)
 family_summary[is.na(child.count), child.count:=0]
 family_summary <- merge(family_summary, child_age, by="user.id", all=T)
 family_summary <- merge(family_summary, child_data[child.idx==1, list(user.id, age.at.first.child=age.at.child)], by="user.id", all=T)
