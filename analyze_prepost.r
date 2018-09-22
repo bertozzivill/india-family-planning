@@ -6,7 +6,7 @@
 
 ## School info: 
 # 1.30th July sunshine Academy 28 boys 24 girls. -> 52
-# 2. Aug.1st .kendriya vidyala Tambaram 105 boys 125 girls.  -> 130
+# 2. Aug.1st .kendriya vidyala Tambaram 105 boys 125 girls.  -> 230
 # 3. Aug.4th. St.Vincent 78 boys 69 girls. -> 147
 
 ## Hours: 
@@ -14,7 +14,8 @@
 ## 9/3 7-7:30
 ## 9/13 5:45-6:45
 ## 9/15 8-9:15
-## 9/22 12:15-
+## 9/22 12:15-2:34
+
 ## -----------------------------------------------------------------------------------------------------
 
 library(Hmisc)
