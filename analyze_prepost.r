@@ -30,7 +30,8 @@ gg_color_hue <- function(n) {
   hcl(h = hues, l = 65, c = 100)[1:n]
 }
 
-main_dir <- "/Users/bertozzivill/Dropbox/main/Collaborations/my_future_family/chennai_2018/data_090818/clean"
+main_dir <- "/Users/bertozzivill/Dropbox (Personal)/main/Collaborations/games/my_future_family/chennai_2018/data_090818/clean"
+plot_dir <- file.path(main_dir, "plots/prepost")
 
 data <- fread(file.path(main_dir, "prepost.csv"))
 data[, question.count:= as.integer(gsub("answer","", key))]
@@ -87,12 +88,17 @@ pre[, male.organs:=100*sum(value.pre==correct.answer & organ.sex=="Male")/6, by=
 scores_pre <- unique(pre[, list(user.id, sex, school, total, female.organs, male.organs)])
 scores_pre <- melt(scores_pre, id.vars = c("user.id", "sex", "school"), value.name="score")
 
-ggplot(scores_pre, aes(x=variable, y=score)) +
-  geom_boxplot(aes(fill=sex), alpha=0.5) +
-  facet_grid(school~.) +
-  labs(title="Scores: Overall and by Sex of Question",
-       x="",
-       y="Score")
+school_sex_boxplot <- ggplot(scores_pre, aes(x=variable, y=score)) +
+                      geom_boxplot(aes(fill=sex), alpha=0.5) +
+                      facet_grid(school~.) +
+                      labs(title="Scores: Overall and by Sex of Student",
+                           x="",
+                           y="Score")
+
+png(file.path(plot_dir, "school_sex_boxplot.png"), height=900, width=900, units = "px", res=140)
+  print(school_sex_boxplot)
+graphics.off()
+
 
 ### ------ Assessment of pre and post test in comparison to each other -----------------------------
 
@@ -127,13 +133,28 @@ complete[, score.gain:=score.post-score.pre]
 
 scores <- unique(complete[, list(user.id, score.pre, score.post, score.gain)])
 
-ggplot(scores, aes(x=score.pre, y=score.post))+ 
+prepost_scatter <- ggplot(scores, aes(x=score.pre, y=score.post))+ 
   geom_jitter(alpha=0.5) +
-  geom_abline()
+  geom_abline() +
+  theme_minimal() +
+  labs(x="Pregame Score",
+       y="Postgame Score")
 
-ggplot(scores, aes(x=score.gain)) +
-  geom_density() + 
-  geom_vline(xintercept=0, color="red")
+png(file.path(plot_dir, "prepost_scatter.png"), height=900, width=900, units = "px", res=140)
+  print(prepost_scatter)
+graphics.off()
+
+score_gain_dist <- ggplot(scores, aes(x=score.gain)) +
+                        geom_density(fill="black", alpha=0.5) + 
+                        geom_vline(xintercept=0, color="blue") +
+                        theme_minimal() +
+                        labs(x="Score Gain",
+                             y="Density")
+png(file.path(plot_dir, "score_gain_dist.png"), height=900, width=1000, units = "px", res=140)
+  print(score_gain_dist)
+graphics.off()
+
+
 
 ## todo on these: assess prob and cumulative prob of getting an answer right by random chance, given the format of the quiz
 
@@ -147,7 +168,7 @@ complete_long[, value:=factor(value, levels=rev(c("Anus Female", "Anus Male", "B
 
 colors <- c("#808080", gg_color_hue(10))
 
-ggplot(complete_long, aes(x=variable)) +
+answer_percents <- ggplot(complete_long, aes(x=variable)) +
   geom_bar(aes(fill=value)) + 
   scale_fill_manual(values=colors) + 
   # coord_flip() +
@@ -157,12 +178,18 @@ ggplot(complete_long, aes(x=variable)) +
         legend.title = element_blank()) +
   labs(x="", y="")
 
+png(file.path(plot_dir, "answer_percents.png"), height=900, width=1500, units = "px", res=140)
+  print(answer_percents)
+graphics.off()
+
 threecolor <- gg_color_hue(3)
 complete_long[, short.answer:= ifelse(value==correct.answer, "Correct", 
                                       ifelse(value=="not sure", "Not Sure", "Incorrect"))]
 complete_long[, short.answer:=factor(short.answer, levels=c("Incorrect", "Not Sure", "Correct"))]
-ggplot(complete_long, aes(x=variable)) +
-  geom_bar(aes(fill=short.answer)) + 
+
+
+correct_answer_percents <- ggplot(complete_long, aes(x=variable)) +
+  geom_bar(aes(fill=short.answer), alpha=0.9) + 
   scale_fill_manual(values=c(threecolor[1], threecolor[3], threecolor[2])) + 
   # coord_flip() +
   facet_wrap(~question) +
@@ -171,4 +198,7 @@ ggplot(complete_long, aes(x=variable)) +
         legend.title = element_blank()) +
   labs(x="", y="")
 
+png(file.path(plot_dir, "correct_answer_percents.png"), height=900, width=1500, units = "px", res=140)
+  print(correct_answer_percents)
+graphics.off()
 
