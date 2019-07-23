@@ -21,6 +21,7 @@
 library(Hmisc)
 library(plyr)
 library(data.table)
+library(RColorBrewer)
 library(ggplot2)
 
 rm(list=ls())
@@ -58,6 +59,7 @@ data[, school:= mapvalues(date, c("30-07", "01-08", "04-08"), c("Sunshine Academ
 no_post <- data[is.na(value.post)]
 no_post[, .N/14, by="school"]
 
+print(paste(length(unique(no_post$user.id)), "of", length(unique(data$user.id)), "students do not have post-tests" )) 
 
 ###---- Assessment of pre-test alone, by gender -----------------------------------
 # adjust "Testicles" to "Testicle" and "Fallopian Tube" to "Fallopian Tubes"
@@ -88,16 +90,66 @@ pre[, male.organs:=100*sum(value.pre==correct.answer & organ.sex=="Male")/6, by=
 scores_pre <- unique(pre[, list(user.id, sex, school, total, female.organs, male.organs)])
 scores_pre <- melt(scores_pre, id.vars = c("user.id", "sex", "school"), value.name="score")
 
-school_sex_boxplot <- ggplot(scores_pre, aes(x=variable, y=score)) +
-                      geom_boxplot(aes(fill=sex), alpha=0.5) +
-                      facet_grid(school~.) +
-                      labs(title="Scores: Overall and by Sex of Student",
-                           x="",
-                           y="Score")
+scores_pre[, variable:=mapvalues(variable, c("total", "male.organs", "female.organs"), 
+                                 c("All Questions", "Male Anatomy", "Female Anatomy"))]
 
-png(file.path(plot_dir, "school_sex_boxplot.png"), height=900, width=900, units = "px", res=140)
-  print(school_sex_boxplot)
+scores_pre[, sex:=mapvalues(sex, c("Female", "Male"), 
+                            c("Female Student", "Male Student"))]
+
+school_sex_boxplot <- ggplot(scores_pre, aes(x=variable, y=score)) +
+  geom_boxplot(aes(color=sex, fill=sex), alpha=0.5) +
+  facet_grid(school~.) +
+  theme_minimal() + 
+  theme(legend.title = element_blank()) +
+  labs(title="Scores: Overall and by Sex of Student",
+       x="",
+       y="Score")
+
+pdf(file.path(plot_dir, "all_school_sex_boxplot.pdf"), height=7, width=7)
+   print(school_sex_boxplot)
 graphics.off()
+
+pre[, value.pre.factor:=factor(value.pre, levels=c("not sure", "Anus Female", "Anus Male", "Bladder Male", "Urethra Female", "Fallopian Tubes", 
+                                                  "Ovary", "Penis", "Testicle", "Uterus", "Vagina"))]
+
+# convert answer counts to proportions
+pre_props <- pre[, list(count=.N), by=list(sex, question, value.pre.factor)]
+pre_props[, tot_count:=sum(count), by=list(sex, question)]
+pre_props[, prop:=count/tot_count]
+
+init_colors <- brewer.pal(10, "Paired")
+colors <- c("#808080", init_colors[5:8], init_colors[1:4], init_colors[9:10])
+
+# todo: highlight correct answer
+pre_answer_bar_bysex <- ggplot(pre_props, aes(x=sex, y=prop)) +
+  geom_bar(stat="identity", aes(fill=value.pre.factor)) + 
+  scale_fill_manual(values=colors) + 
+  facet_wrap(question~., scales="free", labeller = label_wrap_gen()) + 
+  # coord_flip() + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        legend.title = element_blank(),
+  ) +
+  labs(x="", y="Proportion")
+
+pdf(file.path(plot_dir, "all_pre_answers_bysex.pdf"), height=8, width=9)
+  print(pre_answer_bar_bysex)
+graphics.off()
+
+# aggregate by sex
+pre_props_all <- pre_props[, list(count=sum(count), tot_count=sum(tot_count)), by=list(question, value.pre.factor)]
+pre_props_all[, prop:=count/tot_count]
+
+# todo: highlight correct answer
+pre_answer_bar <- ggplot(pre_props_all, aes(x=question, y=prop)) +
+  geom_bar(stat="identity", aes(fill=value.pre.factor)) + 
+  scale_fill_manual(values=colors) + 
+  coord_flip() + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        legend.title = element_blank(),
+  ) +
+  labs(x="", y="Proportion")
 
 
 ### ------ Assessment of pre and post test in comparison to each other -----------------------------
@@ -163,22 +215,23 @@ complete <- complete[value.post!=""] # drop one buggy line for user 544
 complete_long <- melt(complete, id.vars = c("user.id", "question.count", "question", "correct.answer"), 
                       measure.vars=c("value.pre", "value.post"))
 complete_long[, variable:=factor(variable, levels=c("value.pre", "value.post"), labels=c("Pre", "Post"))]
-complete_long[, value:=factor(value, levels=rev(c("Anus Female", "Anus Male", "Bladder Male", "Fallopian Tubes", 
-                                              "Ovary", "Penis", "Testicle", "Urethra Female", "Uterus", "Vagina", "not sure")))]
+complete_long[, value:=factor(value, levels=c("not sure", "Anus Female", "Anus Male", "Bladder Male", "Urethra Female", "Fallopian Tubes", 
+                                              "Ovary", "Penis", "Testicle", "Uterus", "Vagina"))]
 
-colors <- c("#808080", gg_color_hue(10))
+answer_perc_agg <- complete_long[, list(count=.N), by=list(variable, question, value)]
+answer_perc_agg[, prop:= count/sum(count), by=list(variable, question)]
 
-answer_percents <- ggplot(complete_long, aes(x=variable)) +
-  geom_bar(aes(fill=value)) + 
+answer_percents <- ggplot(answer_perc_agg, aes(x=variable)) +
+  geom_bar(aes(fill=value, y = prop), stat="identity") + 
   scale_fill_manual(values=colors) + 
   # coord_flip() +
-  facet_wrap(~question) +
+  facet_wrap(~question,labeller = label_wrap_gen()) +
   theme_minimal() + 
   theme(legend.position = "bottom",
         legend.title = element_blank()) +
-  labs(x="", y="")
+  labs(x="", y="Proportion")
 
-png(file.path(plot_dir, "answer_percents.png"), height=900, width=1500, units = "px", res=140)
+png(file.path(plot_dir, "answer_percents.png"), height=1100, width=1000, units = "px", res=140)
   print(answer_percents)
 graphics.off()
 
@@ -187,18 +240,20 @@ complete_long[, short.answer:= ifelse(value==correct.answer, "Correct",
                                       ifelse(value=="not sure", "Not Sure", "Incorrect"))]
 complete_long[, short.answer:=factor(short.answer, levels=c("Incorrect", "Not Sure", "Correct"))]
 
+correct_agg <- complete_long[, list(count=.N), by=list(variable, question, short.answer)]
+correct_agg[, prop:= count/sum(count), by=list(variable, question)]
 
-correct_answer_percents <- ggplot(complete_long, aes(x=variable)) +
-  geom_bar(aes(fill=short.answer), alpha=0.9) + 
+correct_answer_percents <- ggplot(correct_agg, aes(x=variable)) +
+  geom_bar(aes(fill=short.answer, y=prop), stat="identity", alpha=0.9) + 
   scale_fill_manual(values=c(threecolor[1], threecolor[3], threecolor[2])) + 
   # coord_flip() +
-  facet_wrap(~question) +
+  facet_wrap(~question, labeller = label_wrap_gen()) +
   theme_minimal() + 
   theme(legend.position = "bottom",
         legend.title = element_blank()) +
-  labs(x="", y="")
+  labs(x="", y="Proportion")
 
-png(file.path(plot_dir, "correct_answer_percents.png"), height=900, width=1500, units = "px", res=140)
+png(file.path(plot_dir, "correct_answer_percents.png"), height=1100, width=1000, units = "px", res=140)
   print(correct_answer_percents)
 graphics.off()
 
