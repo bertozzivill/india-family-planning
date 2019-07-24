@@ -101,13 +101,27 @@ school_sex_boxplot <- ggplot(scores_pre, aes(x=variable, y=score)) +
   facet_grid(school~.) +
   theme_minimal() + 
   theme(legend.title = element_blank()) +
-  labs(title="Scores: Overall and by Sex of Student",
+  labs(title="Pre-Test Scores: Overall and by Sex of Student",
        x="",
        y="Score")
 
 pdf(file.path(plot_dir, "all_school_sex_boxplot.pdf"), height=7, width=7)
-   print(school_sex_boxplot)
+  print(school_sex_boxplot)
 graphics.off()
+
+school_sex_boxplot_v2 <- ggplot(scores_pre, aes(x=school, y=score)) +
+                          geom_boxplot(aes(color=sex, fill=sex), alpha=0.5) +
+                          facet_grid(variable~sex) +
+                          theme_minimal() + 
+                          theme(legend.title = element_blank(),
+                                legend.position = "none",
+                                axis.text.x=element_text(angle=45, hjust=1)) +
+                          labs(title="Pre-Test Scores: Overall and by Type of Question",
+                               x="",
+                               y="Score")
+
+
+
 
 pre[, value.pre.factor:=factor(value.pre, levels=c("not sure", "Anus Female", "Anus Male", "Bladder Male", "Urethra Female", "Fallopian Tubes", 
                                                   "Ovary", "Penis", "Testicle", "Uterus", "Vagina"))]
