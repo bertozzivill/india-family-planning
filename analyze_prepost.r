@@ -88,15 +88,15 @@ pre[, female.organs:=100*sum(value.pre==correct.answer & organ.sex=="Female")/8,
 pre[, male.organs:=100*sum(value.pre==correct.answer & organ.sex=="Male")/6, by=user.id]
 
 scores_pre <- unique(pre[, list(user.id, sex, school, total, female.organs, male.organs)])
-scores_pre <- melt(scores_pre, id.vars = c("user.id", "sex", "school"), value.name="score")
+scores_pre <- melt(scores_pre, id.vars = c("user.id", "sex", "school"), value.name="score", variable.name = "question_type")
 
-scores_pre[, variable:=mapvalues(variable, c("total", "male.organs", "female.organs"), 
-                                 c("All Questions", "Male Anatomy", "Female Anatomy"))]
+scores_pre[, question_type:=mapvalues(question_type, c("total", "male.organs", "female.organs"), 
+                                 c("All Questions", "Male Anatomy Questions", "Female Anatomy Questions"))]
 
 scores_pre[, sex:=mapvalues(sex, c("Female", "Male"), 
                             c("Female Student", "Male Student"))]
 
-school_sex_boxplot <- ggplot(scores_pre, aes(x=variable, y=score)) +
+school_sex_boxplot <- ggplot(scores_pre, aes(x=question_type, y=score)) +
   geom_boxplot(aes(color=sex, fill=sex), alpha=0.5) +
   facet_grid(school~.) +
   theme_minimal() + 
@@ -111,7 +111,7 @@ graphics.off()
 
 school_sex_boxplot_v2 <- ggplot(scores_pre, aes(x=school, y=score)) +
                           geom_boxplot(aes(color=sex, fill=sex), alpha=0.5) +
-                          facet_grid(variable~sex) +
+                          facet_grid(question_type~sex) +
                           theme_minimal() + 
                           theme(legend.title = element_blank(),
                                 legend.position = "none",
@@ -125,6 +125,9 @@ school_sex_boxplot_v2 <- ggplot(scores_pre, aes(x=school, y=score)) +
 
 pre[, value.pre.factor:=factor(value.pre, levels=c("not sure", "Anus Female", "Anus Male", "Bladder Male", "Urethra Female", "Fallopian Tubes", 
                                                   "Ovary", "Penis", "Testicle", "Uterus", "Vagina"))]
+
+# save table of correct answers
+correct_key <- unique(data[, list(question, correct.answer)])
 
 # convert answer counts to proportions
 pre_props <- pre[, list(count=.N), by=list(sex, question, value.pre.factor)]
@@ -153,11 +156,14 @@ graphics.off()
 # aggregate by sex
 pre_props_all <- pre_props[, list(count=sum(count), tot_count=sum(tot_count)), by=list(question, value.pre.factor)]
 pre_props_all[, prop:=count/tot_count]
+pre_props_all <- merge(pre_props_all, correct_key, by="question", all=T)
+pre_props_all[, is.correct:= ifelse(value.pre.factor==correct.answer, "Correct Answer", "Wrong Answer")]
 
-# todo: highlight correct answer
 pre_answer_bar <- ggplot(pre_props_all, aes(x=question, y=prop)) +
-  geom_bar(stat="identity", aes(fill=value.pre.factor)) + 
+  geom_bar(stat="identity", aes(fill=value.pre.factor, color=is.correct, linetype=is.correct)) + 
   scale_fill_manual(values=colors) + 
+  scale_color_manual(values = c("black", "white")) +
+  scale_linetype_manual(values=c("solid", "blank")) + 
   coord_flip() + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1),
@@ -186,6 +192,7 @@ notsure_post <- complete[value.post=="not sure"]
 notsure_post[, count:=.N, by=user.id]
 notsure_post[question.count==1 & count==14, .N, by="school"]
 notsure_post <- notsure_post[count==14]
+notsure_ids <- unique(notsure_post$user.id)
 
 ggplot(notsure_post, aes(x=question)) +
   geom_bar(aes(fill=value.pre))
@@ -198,9 +205,10 @@ complete[, score.post:=100*sum(value.post==correct.answer)/14, by="user.id"]
 complete[, score.gain:=score.post-score.pre]
 
 scores <- unique(complete[, list(user.id, score.pre, score.post, score.gain)])
+scores[, post_status:=ifelse(user.id %in% notsure_ids, "Null Post Test", "Attempted Post Test") ]
 
 prepost_scatter <- ggplot(scores, aes(x=score.pre, y=score.post))+ 
-  geom_jitter(alpha=0.5) +
+  geom_jitter(aes(color=post_status)) +
   geom_abline() +
   theme_minimal() +
   labs(x="Pregame Score",
@@ -210,7 +218,7 @@ png(file.path(plot_dir, "prepost_scatter.png"), height=900, width=900, units = "
   print(prepost_scatter)
 graphics.off()
 
-score_gain_dist <- ggplot(scores, aes(x=score.gain)) +
+score_gain_dist <- ggplot(scores[!post_status %like% "Null"], aes(x=score.gain)) +
                         geom_density(fill="black", alpha=0.5) + 
                         geom_vline(xintercept=0, color="blue") +
                         theme_minimal() +
