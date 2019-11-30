@@ -53,7 +53,7 @@ data[, date:= ifelse(is.na(timestamp.pre), format(as.Date(timestamp.post), "%d-%
 
 # only keep data from three reported dates: July 30, August 1, August 4
 data <- data[date %in% c("30-07", "01-08", "04-08")]
-data[, school:= mapvalues(date, c("30-07", "01-08", "04-08"), c("Sunshine Academy", "Kendriya Vidyala Tambaram", "St Vincent"))]
+data[, school:= mapvalues(date, c("30-07", "01-08", "04-08"), c("Sunshine Academy", "Kendriya Vidyala \n Tambaram", "St Vincent"))]
 
 # question: how many people don't have post tests? are they mostly from one date/school?
 no_post <- data[is.na(value.post)]
@@ -91,10 +91,10 @@ scores_pre <- unique(pre[, list(user.id, sex, school, total, female.organs, male
 scores_pre <- melt(scores_pre, id.vars = c("user.id", "sex", "school"), value.name="score", variable.name = "question_type")
 
 scores_pre[, question_type:=mapvalues(question_type, c("total", "male.organs", "female.organs"), 
-                                 c("All Questions", "Male Anatomy Questions", "Female Anatomy Questions"))]
+                                 c("All Questions", "Male Anatomy \n Questions", "Female Anatomy \n Questions"))]
 
 scores_pre[, sex:=mapvalues(sex, c("Female", "Male"), 
-                            c("Female Student", "Male Student"))]
+                            c("Female Respondent", "Male Respondent"))]
 
 scores_pre_agg <- scores_pre[, list(mean=mean(score), se=sd(score)/sqrt(.N)), by=list(sex, school, question_type)]
 
@@ -102,15 +102,30 @@ school_sex_barplot <- ggplot(scores_pre_agg[question_type=="All Questions"], aes
 geom_bar(aes(color=sex, fill=sex), alpha=0.75, position=position_dodge(), stat="identity") +
 geom_errorbar(aes(group=sex), position=position_dodge(0.9), width=0.2) + 
 theme_minimal() + 
-theme(legend.title = element_blank(),
-      axis.text.x=element_text(angle=15)) +
-labs(title="Pre-Test Scores, by School and Sex of Student",
+theme(legend.title = element_blank()) +
+labs(title="Pre-Test Scores, by School and Sex of Respondent",
      x="",
      y="Score")
 
 pdf(file.path(plot_dir, "school_sex_barplot.pdf"), height=7, width=7)
   print(school_sex_barplot)
 graphics.off()
+
+scores_pre_agg_over_school <- scores_pre[, list(mean=mean(score), se=sd(score)/sqrt(.N)), by=list(sex, question_type)]
+
+question_sex_barplot <- ggplot(scores_pre_agg_over_school, aes(x=question_type, y=mean, ymin=mean-se, ymax=mean+se)) +
+  geom_bar(aes(color=sex, fill=sex), alpha=0.75, position=position_dodge(), stat="identity") +
+  geom_errorbar(aes(group=sex), position=position_dodge(0.9), width=0.2) + 
+  theme_minimal() + 
+  theme(legend.title = element_blank()) +
+  labs(title="Pre-Test Scores, by Type of Question \n and Sex of Respondent",
+       x="",
+       y="Score")
+
+pdf(file.path(plot_dir, "question_sex_barplot.pdf"), height=7, width=7)
+  print(question_sex_barplot)
+graphics.off()
+
 
 pre[, value.pre.factor:=factor(value.pre, levels=c("not sure", "Anus Female", "Anus Male", "Bladder Male", "Urethra Female", "Fallopian Tubes", 
                                                   "Ovary", "Penis", "Testicle", "Uterus", "Vagina"))]
@@ -142,6 +157,10 @@ pre_answer_bar <- ggplot(pre_props, aes(x=question, y=prop)) +
   ) +
   labs(x="", y="Proportion")
 
+pdf(file.path(plot_dir, "pretest_answers_barplot.pdf"), height=7, width=11)
+  print(pre_answer_bar)
+graphics.off()
+
 
 ### ------ Assessment of pre and post test in comparison to each other -----------------------------
 
@@ -157,76 +176,56 @@ invalid_users <- unique(complete[elapsed.minutes<4 | elapsed.minutes>50]$user.id
 complete <- complete[!(user.id %in% invalid_users)]
 
 
-# question: what is the pre/post time gap for those who answer entirely "not sure" to post-tests? is there a difference 
-# between schools? 
+# find people who answer entirely "not sure"
 notsure_post <- complete[value.post=="not sure"]
 notsure_post[, count:=.N, by=user.id]
 notsure_post[question.count==1 & count==14, .N, by="school"]
 notsure_post <- notsure_post[count==14]
 notsure_ids <- unique(notsure_post$user.id)
-
-ggplot(notsure_post, aes(x=question)) +
-  geom_bar(aes(fill=value.pre))
-
+complete[, post.status:=ifelse(user.id %in% notsure_ids, "Null Post Test", "Attempted Post Test") ]
 
 # calculate scores
-complete[, c("elapsed.minutes"):=NULL]
 complete[, score.pre:=100*sum(value.pre==correct.answer)/14, by="user.id"]
 complete[, score.post:=100*sum(value.post==correct.answer)/14, by="user.id"]
 complete[, score.gain:=score.post-score.pre]
 
-scores <- unique(complete[, list(user.id, score.pre, score.post, score.gain)])
-scores[, post_status:=ifelse(user.id %in% notsure_ids, "Null Post Test", "Attempted Post Test") ]
+scores <- unique(complete[, list(user.id,post.status, score.pre, score.post, score.gain)])
 
 prepost_scatter <- ggplot(scores, aes(x=score.pre, y=score.post))+ 
-  geom_jitter(aes(color=post_status)) +
+  geom_jitter(aes(color=post.status)) +
   geom_abline() +
   theme_minimal() +
+  theme(legend.title = element_blank()) + 
   labs(x="Pregame Score",
-       y="Postgame Score")
+       y="Postgame Score",
+       title="Pre- vs Post-Test Scores, \n by Type of Post-Test")
 
-png(file.path(plot_dir, "prepost_scatter.png"), height=900, width=900, units = "px", res=140)
+pdf(file.path(plot_dir, "prepost_scatter.pdf"), height=7, width=7)
   print(prepost_scatter)
 graphics.off()
 
-score_gain_dist <- ggplot(scores[!post_status %like% "Null"], aes(x=score.gain)) +
-                        geom_density(fill="black", alpha=0.5) + 
-                        geom_vline(xintercept=0, color="blue") +
+score_gain_dist <- ggplot(scores[!post.status %like% "Null"], aes(x=score.gain)) +
+                        geom_density(aes(fill=post.status, color=post.status), alpha=0.5) + 
+                        geom_vline(xintercept=0, color="black") +
                         theme_minimal() +
+                        theme(legend.position = "none") + 
                         labs(x="Score Gain",
-                             y="Density")
-png(file.path(plot_dir, "score_gain_dist.png"), height=900, width=1000, units = "px", res=140)
+                             y="Density",
+                             title="Distribution of Score Gain \nAmong Students who Attempted Post-test")
+pdf(file.path(plot_dir, "score_gain_dist.pdf"), height=7, width=8)
   print(score_gain_dist)
 graphics.off()
-
 
 
 ## todo on these: assess prob and cumulative prob of getting an answer right by random chance, given the format of the quiz
 
 # question-by-question analysis of responses
 complete <- complete[value.post!=""] # drop one buggy line for user 544
-complete_long <- melt(complete, id.vars = c("user.id", "question.count", "question", "correct.answer"), 
+complete_long <- melt(complete, id.vars = c("user.id", "post.status", "question.count", "question", "correct.answer"), 
                       measure.vars=c("value.pre", "value.post"))
 complete_long[, variable:=factor(variable, levels=c("value.pre", "value.post"), labels=c("Pre", "Post"))]
 complete_long[, value:=factor(value, levels=c("not sure", "Anus Female", "Anus Male", "Bladder Male", "Urethra Female", "Fallopian Tubes", 
                                               "Ovary", "Penis", "Testicle", "Uterus", "Vagina"))]
-
-answer_perc_agg <- complete_long[, list(count=.N), by=list(variable, question, value)]
-answer_perc_agg[, prop:= count/sum(count), by=list(variable, question)]
-
-answer_percents <- ggplot(answer_perc_agg, aes(x=variable)) +
-  geom_bar(aes(fill=value, y = prop), stat="identity") + 
-  scale_fill_manual(values=colors) + 
-  # coord_flip() +
-  facet_wrap(~question,labeller = label_wrap_gen()) +
-  theme_minimal() + 
-  theme(legend.position = "bottom",
-        legend.title = element_blank()) +
-  labs(x="", y="Proportion")
-
-png(file.path(plot_dir, "answer_percents.png"), height=1100, width=1000, units = "px", res=140)
-  print(answer_percents)
-graphics.off()
 
 threecolor <- gg_color_hue(3)
 complete_long[, short.answer:= ifelse(value==correct.answer, "Correct", 
@@ -238,15 +237,42 @@ correct_agg[, prop:= count/sum(count), by=list(variable, question)]
 
 correct_answer_percents <- ggplot(correct_agg, aes(x=variable)) +
   geom_bar(aes(fill=short.answer, y=prop), stat="identity", alpha=0.9) + 
-  scale_fill_manual(values=c(threecolor[1], threecolor[3], threecolor[2])) + 
+  scale_fill_manual(values=c(threecolor[1], "#808080", threecolor[2])) + 
   # coord_flip() +
   facet_wrap(~question, labeller = label_wrap_gen()) +
   theme_minimal() + 
   theme(legend.position = "bottom",
         legend.title = element_blank()) +
-  labs(x="", y="Proportion")
+  labs(x="", 
+       y="Proportion",
+       title="Pre- vs Post-Test Responses,\nIncluding Those with Null Post Tests")
 
-png(file.path(plot_dir, "correct_answer_percents.png"), height=1100, width=1000, units = "px", res=140)
+pdf(file.path(plot_dir, "correct_answer_percents.pdf"), height=11, width=10)
   print(correct_answer_percents)
 graphics.off()
+
+# drop null post
+correct_agg_nonull <- complete_long[!post.status %like% "Null", list(count=.N), by=list(variable, question, short.answer)]
+correct_agg_nonull[, prop:= count/sum(count), by=list(variable, question)]
+
+correct_answer_percents_nonull <- ggplot(correct_agg_nonull, aes(x=variable)) +
+  geom_bar(aes(fill=short.answer, y=prop), stat="identity", alpha=0.9) + 
+  scale_fill_manual(values=c(threecolor[1], "#808080", threecolor[2])) + 
+  # coord_flip() +
+  facet_wrap(~question, labeller = label_wrap_gen()) +
+  theme_minimal() + 
+  theme(legend.position = "bottom",
+        legend.title = element_blank()) +
+  labs(x="", 
+       y="Proportion",
+       title="Pre- vs Post-Test Responses,\nExcluding Those with Null Post Tests")
+
+pdf(file.path(plot_dir, "correct_answer_percents_nonull.pdf"), height=11, width=10)
+  print(correct_answer_percents_nonull)
+graphics.off()
+
+
+
+
+
 
