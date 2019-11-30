@@ -96,32 +96,21 @@ scores_pre[, question_type:=mapvalues(question_type, c("total", "male.organs", "
 scores_pre[, sex:=mapvalues(sex, c("Female", "Male"), 
                             c("Female Student", "Male Student"))]
 
-school_sex_boxplot <- ggplot(scores_pre, aes(x=question_type, y=score)) +
-  geom_boxplot(aes(color=sex, fill=sex), alpha=0.5) +
-  facet_grid(school~.) +
-  theme_minimal() + 
-  theme(legend.title = element_blank()) +
-  labs(title="Pre-Test Scores: Overall and by Sex of Student",
-       x="",
-       y="Score")
+scores_pre_agg <- scores_pre[, list(mean=mean(score), se=sd(score)/sqrt(.N)), by=list(sex, school, question_type)]
 
-pdf(file.path(plot_dir, "all_school_sex_boxplot.pdf"), height=7, width=7)
-  print(school_sex_boxplot)
+school_sex_barplot <- ggplot(scores_pre_agg[question_type=="All Questions"], aes(x=school, y=mean, ymin=mean-se, ymax=mean+se)) +
+geom_bar(aes(color=sex, fill=sex), alpha=0.75, position=position_dodge(), stat="identity") +
+geom_errorbar(aes(group=sex), position=position_dodge(0.9), width=0.2) + 
+theme_minimal() + 
+theme(legend.title = element_blank(),
+      axis.text.x=element_text(angle=15)) +
+labs(title="Pre-Test Scores, by School and Sex of Student",
+     x="",
+     y="Score")
+
+pdf(file.path(plot_dir, "school_sex_barplot.pdf"), height=7, width=7)
+  print(school_sex_barplot)
 graphics.off()
-
-school_sex_boxplot_v2 <- ggplot(scores_pre, aes(x=school, y=score)) +
-                          geom_boxplot(aes(color=sex, fill=sex), alpha=0.5) +
-                          facet_grid(question_type~sex) +
-                          theme_minimal() + 
-                          theme(legend.title = element_blank(),
-                                legend.position = "none",
-                                axis.text.x=element_text(angle=45, hjust=1)) +
-                          labs(title="Pre-Test Scores: Overall and by Type of Question",
-                               x="",
-                               y="Score")
-
-
-
 
 pre[, value.pre.factor:=factor(value.pre, levels=c("not sure", "Anus Female", "Anus Male", "Bladder Male", "Urethra Female", "Fallopian Tubes", 
                                                   "Ovary", "Penis", "Testicle", "Uterus", "Vagina"))]
@@ -130,37 +119,19 @@ pre[, value.pre.factor:=factor(value.pre, levels=c("not sure", "Anus Female", "A
 correct_key <- unique(data[, list(question, correct.answer)])
 
 # convert answer counts to proportions
-pre_props <- pre[, list(count=.N), by=list(sex, question, value.pre.factor)]
-pre_props[, tot_count:=sum(count), by=list(sex, question)]
+pre_props <- pre[, list(count=.N), by=list(question, value.pre.factor)]
+pre_props[, tot_count:=sum(count), by=list(question)]
 pre_props[, prop:=count/tot_count]
+pre_props <- merge(pre_props, correct_key, by="question", all=T)
+pre_props[, is.correct:= ifelse(value.pre.factor==correct.answer, "Correct Answer", "Wrong Answer")]
 
-init_colors <- brewer.pal(10, "Paired")
+
+init_colors <- brewer.pal(9, "YlGnBu")
 colors <- c("#808080", init_colors[5:8], init_colors[1:4], init_colors[9:10])
+colors <- c("#808080","#fffff3", init_colors )
 
-# todo: highlight correct answer
-pre_answer_bar_bysex <- ggplot(pre_props, aes(x=sex, y=prop)) +
-  geom_bar(stat="identity", aes(fill=value.pre.factor)) + 
-  scale_fill_manual(values=colors) + 
-  facet_wrap(question~., scales="free", labeller = label_wrap_gen()) + 
-  # coord_flip() + 
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1),
-        legend.title = element_blank(),
-  ) +
-  labs(x="", y="Proportion")
-
-pdf(file.path(plot_dir, "all_pre_answers_bysex.pdf"), height=8, width=9)
-  print(pre_answer_bar_bysex)
-graphics.off()
-
-# aggregate by sex
-pre_props_all <- pre_props[, list(count=sum(count), tot_count=sum(tot_count)), by=list(question, value.pre.factor)]
-pre_props_all[, prop:=count/tot_count]
-pre_props_all <- merge(pre_props_all, correct_key, by="question", all=T)
-pre_props_all[, is.correct:= ifelse(value.pre.factor==correct.answer, "Correct Answer", "Wrong Answer")]
-
-pre_answer_bar <- ggplot(pre_props_all, aes(x=question, y=prop)) +
-  geom_bar(stat="identity", aes(fill=value.pre.factor, color=is.correct, linetype=is.correct)) + 
+pre_answer_bar <- ggplot(pre_props, aes(x=question, y=prop)) +
+  geom_bar(stat="identity", aes(fill=value.pre.factor, color=is.correct, linetype=is.correct), size=1) + 
   scale_fill_manual(values=colors) + 
   scale_color_manual(values = c("black", "white")) +
   scale_linetype_manual(values=c("solid", "blank")) + 
