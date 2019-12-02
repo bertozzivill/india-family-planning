@@ -118,7 +118,7 @@ question_sex_barplot <- ggplot(scores_pre_agg_over_school, aes(x=question_type, 
   geom_errorbar(aes(group=sex), position=position_dodge(0.9), width=0.2) + 
   theme_minimal() + 
   theme(legend.title = element_blank()) +
-  labs(title="Pre-Test Scores, by Type of Question \n and Sex of Respondent",
+  labs(title="Pre-Test Scores, by Type of Question and Sex of Respondent",
        x="",
        y="Score")
 
@@ -155,9 +155,10 @@ pre_answer_bar <- ggplot(pre_props, aes(x=question, y=prop)) +
   theme(axis.text.x = element_text(angle=45, hjust=1),
         legend.title = element_blank(),
   ) +
-  labs(x="", y="Proportion")
+  labs(x="", y="Proportion",
+       title="Proportional Responses to Pre-Test")
 
-pdf(file.path(plot_dir, "pretest_answers_barplot.pdf"), height=7, width=11)
+pdf(file.path(plot_dir, "pretest_answers_barplot.pdf"), height=8, width=11)
   print(pre_answer_bar)
 graphics.off()
 
@@ -198,7 +199,7 @@ prepost_scatter <- ggplot(scores, aes(x=score.pre, y=score.post))+
   theme(legend.title = element_blank()) + 
   labs(x="Pregame Score",
        y="Postgame Score",
-       title="Pre- vs Post-Test Scores, \n by Type of Post-Test")
+       title="Pre- vs Post-Test Scores, by Type of Post-Test")
 
 pdf(file.path(plot_dir, "prepost_scatter.pdf"), height=7, width=7)
   print(prepost_scatter)
@@ -211,7 +212,7 @@ score_gain_dist <- ggplot(scores[!post.status %like% "Null"], aes(x=score.gain))
                         theme(legend.position = "none") + 
                         labs(x="Score Gain",
                              y="Density",
-                             title="Distribution of Score Gain \nAmong Students who Attempted Post-test")
+                             title="Distribution of Score Gain Among Students Who Attempted Post-Test")
 pdf(file.path(plot_dir, "score_gain_dist.pdf"), height=7, width=8)
   print(score_gain_dist)
 graphics.off()
@@ -245,7 +246,7 @@ correct_answer_percents <- ggplot(correct_agg, aes(x=variable)) +
         legend.title = element_blank()) +
   labs(x="", 
        y="Proportion",
-       title="Pre- vs Post-Test Responses,\nIncluding Those with Null Post Tests")
+       title="Pre- vs Post-Test Responses, Including Those with Null Post Tests")
 
 pdf(file.path(plot_dir, "correct_answer_percents.pdf"), height=11, width=10)
   print(correct_answer_percents)
@@ -265,7 +266,7 @@ correct_answer_percents_nonull <- ggplot(correct_agg_nonull, aes(x=variable)) +
         legend.title = element_blank()) +
   labs(x="", 
        y="Proportion",
-       title="Pre- vs Post-Test Responses,\nExcluding Those with Null Post Tests")
+       title="Pre- vs Post-Test Responses, Excluding Those with Null Post Tests")
 
 pdf(file.path(plot_dir, "correct_answer_percents_nonull.pdf"), height=11, width=10)
   print(correct_answer_percents_nonull)
