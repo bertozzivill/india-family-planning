@@ -191,6 +191,8 @@ complete[, score.post:=100*sum(value.post==correct.answer)/14, by="user.id"]
 complete[, score.gain:=score.post-score.pre]
 
 scores <- unique(complete[, list(user.id,post.status, score.pre, score.post, score.gain)])
+non_null <- scores[!post.status %like% "Null"]
+t.test(non_null$score.gain)
 
 prepost_scatter <- ggplot(scores, aes(x=score.pre, y=score.post))+ 
   geom_jitter(aes(color=post.status)) +
@@ -205,7 +207,7 @@ pdf(file.path(plot_dir, "prepost_scatter.pdf"), height=7, width=7)
   print(prepost_scatter)
 graphics.off()
 
-score_gain_dist <- ggplot(scores[!post.status %like% "Null"], aes(x=score.gain)) +
+score_gain_dist <- ggplot(non_null, aes(x=score.gain)) +
                         geom_density(aes(fill=post.status, color=post.status), alpha=0.5) + 
                         geom_vline(xintercept=0, color="black") +
                         theme_minimal() +
@@ -215,6 +217,23 @@ score_gain_dist <- ggplot(scores[!post.status %like% "Null"], aes(x=score.gain))
                              title="Distribution of Score Gain Among Students Who Attempted Post-Test")
 pdf(file.path(plot_dir, "score_gain_dist.pdf"), height=7, width=8)
   print(score_gain_dist)
+graphics.off()
+
+non_null_summary <- melt(non_null, id.vars=c("post.status", "user.id"), variable.name = "test_type", value.name="score")
+non_null_summary <- non_null_summary[!test_type %like% "gain"]
+non_null_summary[, test_type:=factor(test_type, levels=c("score.pre", "score.post"),
+                                     labels=c("Pre-Test", "Post-Test"))]
+prepost_summary <- ggplot(non_null_summary, aes(x=test_type, y=score, fill=test_type, color=test_type)) + 
+                            geom_violin(alpha=0.5) +
+                            stat_summary(fun.data = "mean_sdl",  fun.args = list(mult = 1), 
+                                        geom = "pointrange") + 
+                            theme(legend.position = "none") +
+                            labs(title="Score Comparison Among\nThose Who Attempted Post-Test",
+                                 x="",
+                                 y="Score")
+
+pdf(file.path(plot_dir, "prepost_summary_violin.pdf"), height=5, width=4)
+  print(prepost_summary)
 graphics.off()
 
 
