@@ -107,11 +107,26 @@ labs(title="Pre-Test Scores, by School and Sex of Respondent",
      x="",
      y="Score")
 
+t.test(scores_pre[question_type%like% "All" & school %like% "Vidyala"]$score,
+       scores_pre[question_type%like% "All" & !school %like% "Vidyala"]$score)
+
+t.test(scores_pre[question_type%like% "All" & school %like% "Vincent" & sex %like% "Female"]$score,
+       scores_pre[question_type%like% "All" & school %like% "Vincent" & sex %like% "Male"]$score)
+
+
 pdf(file.path(plot_dir, "school_sex_barplot.pdf"), height=7, width=7)
   print(school_sex_barplot)
 graphics.off()
 
 scores_pre_agg_over_school <- scores_pre[, list(mean=mean(score), se=sd(score)/sqrt(.N)), by=list(sex, question_type)]
+
+t.test(scores_pre[question_type%like% "Female" & sex %like% "Female"]$score,
+       scores_pre[question_type%like% "Female" & sex %like% "Male"]$score)
+t.test(scores_pre[question_type%like% "Male" & sex %like% "Female"]$score,
+       scores_pre[question_type%like% "Male" & sex %like% "Male"]$score)
+
+
+
 
 question_sex_barplot <- ggplot(scores_pre_agg_over_school, aes(x=question_type, y=mean, ymin=mean-se, ymax=mean+se)) +
   geom_bar(aes(color=sex, fill=sex), alpha=0.75, position=position_dodge(), stat="identity") +
@@ -140,6 +155,11 @@ pre_props[, prop:=count/tot_count]
 pre_props <- merge(pre_props, correct_key, by="question", all=T)
 pre_props[, is.correct:= ifelse(value.pre.factor==correct.answer, "Correct Answer", "Wrong Answer")]
 
+# find which answers have a plurality of correct responses
+prop_correct <- pre_props[is.correct %like% "Correct", list(question, prop.correct=prop)]
+pre_props <- merge(pre_props, prop_correct)
+pre_props[, diff.correct:= prop.correct-max(prop), by="question"]
+unique(pre_props[diff.correct!=0]$question)
 
 init_colors <- brewer.pal(9, "YlGnBu")
 colors <- c("#808080", init_colors[5:8], init_colors[1:4], init_colors[9:10])
@@ -193,6 +213,9 @@ complete[, score.gain:=score.post-score.pre]
 scores <- unique(complete[, list(user.id,post.status, score.pre, score.post, score.gain)])
 non_null <- scores[!post.status %like% "Null"]
 t.test(non_null$score.gain)
+
+null <- scores[post.status %like% "Null"]
+t.test(null$score.gain)
 
 prepost_scatter <- ggplot(scores, aes(x=score.pre, y=score.post))+ 
   geom_jitter(aes(color=post.status)) +
