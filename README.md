@@ -4,3 +4,5 @@ Code to analyze a pilot study for a family planning game distributed to secondar
 
 ## Pre-post assessment
 An updated version of the game was deployed in Chennai, India in the summer of 2018. This version included a built-in pre/post game to assess knowledge gain. The data for this portion of the study is available [here](https://osf.io/gtfu5/files/).
+
+DOI for the latest release of this repo: https://zenodo.org/badge/latestdoi/120968277
