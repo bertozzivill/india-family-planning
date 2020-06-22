@@ -4,18 +4,6 @@
 ## Date: August 9th 2018
 ## Description: Analyze pre-post test from MFF game pilot in Chennai
 
-## School info: 
-# 1.30th July sunshine Academy 28 boys 24 girls. -> 52
-# 2. Aug.1st .kendriya vidyala Tambaram 105 boys 125 girls.  -> 230
-# 3. Aug.4th. St.Vincent 78 boys 69 girls. -> 147
-
-## Hours: 
-## 9/2 4:30-6
-## 9/3 7-7:30
-## 9/13 5:45-6:45
-## 9/15 8-9:15
-## 9/22 12:15-2:34
-
 ## -----------------------------------------------------------------------------------------------------
 
 library(Hmisc)
@@ -53,7 +41,7 @@ data[, date:= ifelse(is.na(timestamp.pre), format(as.Date(timestamp.post), "%d-%
 
 # only keep data from three reported dates: July 30, August 1, August 4
 data <- data[date %in% c("30-07", "01-08", "04-08")]
-data[, school:= mapvalues(date, c("30-07", "01-08", "04-08"), c("Sunshine Academy", "Kendriya Vidyala \n Tambaram", "St Vincent"))]
+data[, school:= mapvalues(date, c("30-07", "01-08", "04-08"), c("School 1", "School 2", "School 3"))]
 
 # question: how many people don't have post tests? are they mostly from one date/school?
 no_post <- data[is.na(value.post)]
@@ -107,11 +95,11 @@ labs(title="Pre-Test Scores, by School and Sex of Respondent",
      x="",
      y="Score")
 
-t.test(scores_pre[question_type%like% "All" & school %like% "Vidyala"]$score,
-       scores_pre[question_type%like% "All" & !school %like% "Vidyala"]$score)
+t.test(scores_pre[question_type%like% "All" & school=="School 1"]$score,
+       scores_pre[question_type%like% "All" & school!="School 1"]$score)
 
-t.test(scores_pre[question_type%like% "All" & school %like% "Vincent" & sex %like% "Female"]$score,
-       scores_pre[question_type%like% "All" & school %like% "Vincent" & sex %like% "Male"]$score)
+t.test(scores_pre[question_type%like% "All" & school=="School 2" & sex %like% "Female"]$score,
+       scores_pre[question_type%like% "All" & school!="School 2" & sex %like% "Male"]$score)
 
 
 pdf(file.path(plot_dir, "school_sex_barplot.pdf"), height=7, width=7)
